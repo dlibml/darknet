@@ -1,9 +1,47 @@
+#include "darknet.h"
+#include "ui_utils.h"
+#include "weights_visitor.h"
+#include "yolo.h"
+
 #include <dlib/cmd_line_parser.h>
+#include <dlib/gui_widgets.h>
+
+template <typename net_type> auto detect(
+    net_type& net,
+    const dlib::matrix<dlib::rgb_pixel>& image,
+    const std::vector<std::string>& labels,
+    const float conf_thresh = 0.25,
+    const float nms_thresh = 0.45,
+    const long img_size = 416) -> std::vector<detection>
+{
+    dlib::matrix<dlib::rgb_pixel> scaled(img_size, img_size);
+    dlib::resize_image(image, scaled);
+    net(scaled);
+    const auto& out8 = dlib::layer<darknet::ytag8>(net).get_output();
+    const auto& out16 = dlib::layer<darknet::ytag16>(net).get_output();
+    const auto& out32 = dlib::layer<darknet::ytag32>(net).get_output();
+    std::vector<detection> detections;
+    // add_detections(out8, {{10, 13}, {16, 30}, {33, 23}}, labels, 8, conf_thresh, detections);
+    // add_detections(out16, {{30, 61}, {62, 45}, {59, 119}}, labels, 16, conf_thresh, detections);
+    // add_detections(out32, {{116, 90}, {156, 198}, {373, 326}}, labels, 32, conf_thresh, detections);
+    add_detections(out8, {{12, 16}, {19, 36}, {40, 28}}, labels, 8, conf_thresh, detections);
+    add_detections(out16, {{36, 75}, {76, 55}, {72, 146}}, labels, 16, conf_thresh, detections);
+    add_detections(out32, {{142, 110}, {192, 243}, {459, 401}}, labels, 32, conf_thresh, detections);
+    nms(conf_thresh, nms_thresh, detections);
+    return detections;
+}
 
 int main(const int argc, const char** argv)
 try
 {
     dlib::command_line_parser parser;
+    parser.add_option("input", "Path to video file to process (defaults to webcam)", 1);
+    parser.add_option("num-classes", "number of classes (default: 80)", 1);
+    parser.add_option("weights", "path to the darknet trained weights", 1);
+    parser.add_option("img-size", "image size to process (default: 416)", 1);
+    parser.add_option("conf-thresh", "confidence threshold (default: 0.25)", 1);
+    parser.add_option("nms-thresh", "non-max suppression threshold (default: 0.45)", 1);
+    parser.add_option("fps", "force frames per second (default: 30)", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias for --help");
     parser.add_option("help", "display this message and exit");
@@ -13,6 +51,72 @@ try
     {
         parser.print_options();
         return EXIT_SUCCESS;
+    }
+
+    const int num_classes = dlib::get_option(parser, "num-classes", 80);
+    const std::string weights_path = dlib::get_option(parser, "weights", "");
+    float fps = dlib::get_option(parser, "fps", 30);
+    const long img_size = dlib::get_option(parser, "img-size", 416);
+    const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
+    const float nms_thresh = dlib::get_option(parser, "nms-thresh", 0.45);
+    if (weights_path.empty())
+    {
+        std::cout << "Please provide a path to the trained weights\n";
+        return EXIT_FAILURE;
+    }
+
+    darknet::yolov4_sam_mish_infer yolo;
+    {
+        darknet::yolov4_sam_mish_train net;
+        darknet::setup(net, num_classes);
+        std::cout << "#params: " << dlib::count_parameters(net) << '\n';
+        dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
+        yolo = net;
+        std::cout << yolo << '\n';
+    }
+
+    cv::VideoCapture vid_src;
+    if (parser.option("input"))
+    {
+        const std::string video_path = parser.option("input").argument();
+        cv::VideoCapture file(video_path);
+        if (not parser.option("fps"))
+            fps = file.get(cv::CAP_PROP_FPS);
+        vid_src = file;
+    }
+    else
+    {
+        cv::VideoCapture cap(0);
+        cap.set(cv::CAP_PROP_FPS, fps);
+        vid_src = cap;
+    }
+
+    dlib::image_window win;
+    win.set_title("YOLO");
+    const auto label_to_color = get_color_map();
+    dlib::running_stats_decayed<float> rs;
+    while (not win.is_closed())
+    {
+        dlib::matrix<dlib::rgb_pixel> image;
+        cv::Mat cv_cap;
+        if (!vid_src.read(cv_cap))
+        {
+            break;
+        }
+        // convert the BRG opencv image to RGB dlib image
+        const dlib::cv_image<dlib::bgr_pixel> tmp(cv_cap);
+        // if (win.mirror)
+        dlib::flip_image_left_right(tmp, image);
+        // else
+        // dlib::assign_image(img, tmp);
+        win.clear_overlay();
+        const auto t0 = std::chrono::steady_clock::now();
+        const auto detections = detect(yolo, image, labels, conf_thresh, nms_thresh, img_size);
+        const auto t1 = std::chrono::steady_clock::now();
+        rs.add(std::chrono::duration_cast<std::chrono::duration<float>>(t1 - t0).count());
+        std::cout << "avg fps: " << 1.0f / rs.mean() << '\r' << std::flush;
+        render_bounding_boxes(image, detections, label_to_color);
+        win.set_image(image);
     }
 
     return EXIT_SUCCESS;

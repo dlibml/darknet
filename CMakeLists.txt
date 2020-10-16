@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.14)
-project("dlib template project" LANGUAGES CXX)
+project("Darknet" LANGUAGES CXX)
 
-set(CPACK_PACKAGE_NAME "dlib-template-project")
+set(CPACK_PACKAGE_NAME "darknet")
 set(CPACK_PACKAGE_VERSION_MAJOR "0")
 set(CPACK_PACKAGE_VERSION_MINOR "0")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
@@ -52,15 +52,22 @@ macro(fetch_content name tag repository)
     message("-- Fetching ${name} ${tag}")
     FetchContent_MakeAvailable(${name})
 endmacro()
+find_package(OpenCV REQUIRED)
 
 macro(add_dlib_executable name)
     add_executable(${name} src/${name}.cpp)
-    target_link_libraries(${name} PRIVATE dlib::dlib)
-    target_include_directories(${name} PRIVATE src)
+    target_link_libraries(${name} PRIVATE dlib::dlib ${OpenCV_LIBS})
+    target_include_directories(${name} PRIVATE src ${OpenCV_INCLUDE_DIRS})
     target_compile_options(${name} PRIVATE -Wall -Wextra -pedantic -Wno-deprecated-copy)
     install(TARGETS ${name} DESTINATION bin)
+endmacro()
+
+macro(add_dlib_library name)
+    add_library(${name} STATIC src/${name}.cpp)
+    target_link_libraries(${name} PRIVATE dlib::dlib)
 endmacro()
 
 fetch_content(dlib master https://github.com/davisking/dlib.git)
 
 add_dlib_executable(main)
+
