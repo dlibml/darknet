@@ -7,29 +7,6 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-const std::vector<std::string> labels{
-    "person",        "bicycle",       "car",           "motorbike",
-    "aeroplane",     "bus",           "train",         "truck",
-    "boat",          "traffic light", "fire hydrant",  "stop sign",
-    "parking meter", "bench",         "bird",          "cat",
-    "dog",           "horse",         "sheep",         "cow",
-    "elephant",      "bear",          "zebra",         "giraffe",
-    "backpack",      "umbrella",      "handbag",       "tie",
-    "suitcase",      "frisbee",       "skis",          "snowboard",
-    "sports ball",   "kite",          "baseball bat",  "baseball glove",
-    "skateboard",    "surfboard",     "tennis racket", "bottle",
-    "wine glass",    "cup",           "fork",          "knife",
-    "spoon",         "bowl",          "banana",        "apple",
-    "sandwich",      "orange",        "broccoli",      "carrot",
-    "hot dog",       "pizza",         "donut",         "cake",
-    "chair",         "sofa",          "pottedplant",   "bed",
-    "diningtable",   "toilet",        "tvmonitor",     "laptop",
-    "mouse",         "remote",        "keyboard",      "cell phone",
-    "microwave",     "oven",          "toaster",       "sink",
-    "refrigerator",  "book",          "clock",         "vase",
-    "scissors",      "teddy bear",    "hair drier",    "toothbrush",
-};
-
 auto get_random_color(const std::string& label) -> dlib::rgb_pixel
 {
     int seed = 0;
@@ -45,7 +22,7 @@ auto get_random_color(const std::string& label) -> dlib::rgb_pixel
     return rgb;
 }
 
-auto get_color_map() -> std::map<std::string, dlib::rgb_pixel>
+auto get_color_map(const std::vector<std::string>& labels) -> std::map<std::string, dlib::rgb_pixel>
 {
     std::map<std::string, dlib::rgb_pixel> label_to_color;
     for (const auto& label : labels)

@@ -35,8 +35,8 @@ int main(const int argc, const char** argv)
 try
 {
     dlib::command_line_parser parser;
-    parser.add_option("input", "Path to video file to process (defaults to webcam)", 1);
-    parser.add_option("num-classes", "number of classes (default: 80)", 1);
+    parser.add_option("input", "path to video file to process (defaults to webcam)", 1);
+    parser.add_option("names", "path to file with label names (one per line)", 1);
     parser.add_option("weights", "path to the darknet trained weights", 1);
     parser.add_option("img-size", "image size to process (default: 416)", 1);
     parser.add_option("conf-thresh", "confidence threshold (default: 0.25)", 1);
@@ -53,8 +53,8 @@ try
         return EXIT_SUCCESS;
     }
 
-    const int num_classes = dlib::get_option(parser, "num-classes", 80);
     const std::string weights_path = dlib::get_option(parser, "weights", "");
+    const std::string names_path = dlib::get_option(parser, "names", "");
     float fps = dlib::get_option(parser, "fps", 30);
     const long img_size = dlib::get_option(parser, "img-size", 416);
     const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
@@ -64,17 +64,33 @@ try
         std::cout << "Please provide a path to the trained weights\n";
         return EXIT_FAILURE;
     }
+    std::vector<std::string> labels;
+    if (names_path.empty())
+    {
+        std::cout << "Please provide a path to the label names file\n";
+        return EXIT_FAILURE;
+    }
+    else
+    {
+        std::ifstream fin(names_path);
+        for(std::string line; std::getline(fin, line); )
+        {
+            labels.push_back(line);
+        }
+    }
+    std::cout << "found " << labels.size() << " classes\n";
 
     darknet::yolov4_sam_mish_infer yolo;
     {
         darknet::yolov4_sam_mish_train net;
-        darknet::setup(net, num_classes);
+        darknet::setup(net, labels.size());
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
         yolo = net;
-        std::cout << yolo << '\n';
+        // std::cout << yolo << '\n';
     }
 
+    bool mirror = false;
     cv::VideoCapture vid_src;
     if (parser.option("input"))
     {
@@ -86,6 +102,7 @@ try
     }
     else
     {
+        mirror = true;
         cv::VideoCapture cap(0);
         cap.set(cv::CAP_PROP_FPS, fps);
         vid_src = cap;
@@ -93,7 +110,7 @@ try
 
     dlib::image_window win;
     win.set_title("YOLO");
-    const auto label_to_color = get_color_map();
+    const auto label_to_color = get_color_map(labels);
     dlib::running_stats_decayed<float> rs;
     while (not win.is_closed())
     {
@@ -105,10 +122,10 @@ try
         }
         // convert the BRG opencv image to RGB dlib image
         const dlib::cv_image<dlib::bgr_pixel> tmp(cv_cap);
-        // if (win.mirror)
-        dlib::flip_image_left_right(tmp, image);
-        // else
-        // dlib::assign_image(img, tmp);
+        if (mirror)
+            dlib::flip_image_left_right(tmp, image);
+        else
+            dlib::assign_image(image, tmp);
         win.clear_overlay();
         const auto t0 = std::chrono::steady_clock::now();
         const auto detections = detect(yolo, image, labels, conf_thresh, nms_thresh, img_size);
