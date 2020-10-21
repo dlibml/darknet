@@ -36,6 +36,7 @@ try
 {
     dlib::command_line_parser parser;
     parser.add_option("input", "path to video file to process (defaults to webcam)", 1);
+    parser.add_option("output", "path to output video file (.mkv extension)", 1);
     parser.add_option("names", "path to file with label names (one per line)", 1);
     parser.add_option("weights", "path to the darknet trained weights", 1);
     parser.add_option("img-size", "image size to process (default: 416)", 1);
@@ -91,7 +92,9 @@ try
     }
 
     bool mirror = false;
+    const std::string out_path = dlib::get_option(parser, "output", "");
     cv::VideoCapture vid_src;
+    cv::VideoWriter vid_snk;
     if (parser.option("input"))
     {
         const std::string video_path = parser.option("input").argument();
@@ -106,6 +109,17 @@ try
         cv::VideoCapture cap(0);
         cap.set(cv::CAP_PROP_FPS, fps);
         vid_src = cap;
+    }
+    int width, height;
+    {
+        cv::Mat cv_tmp;
+        vid_src.read(cv_tmp);
+        width = cv_tmp.cols;
+        height = cv_tmp.rows;
+    }
+    if (not out_path.empty())
+    {
+        vid_snk = cv::VideoWriter(out_path, cv::VideoWriter::fourcc('X', '2', '6', '4'), fps, cv::Size(width, height));
     }
 
     dlib::image_window win;
@@ -134,7 +148,15 @@ try
         std::cout << "avg fps: " << 1.0f / rs.mean() << '\r' << std::flush;
         render_bounding_boxes(image, detections, label_to_color);
         win.set_image(image);
+        if (not out_path.empty())
+        {
+            dlib::matrix<dlib::bgr_pixel> bgr_img(height, width);
+            dlib::assign_image(bgr_img, image);
+            vid_snk.write(dlib::toMat(bgr_img));
+        }
     }
+    if (not out_path.empty())
+        vid_snk.release();
 
     return EXIT_SUCCESS;
 }
