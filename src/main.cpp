@@ -83,7 +83,7 @@ try
     darknet::yolov4_sam_mish_infer yolo;
     {
         darknet::yolov4_sam_mish_train net;
-        darknet::setup(net, labels.size());
+        darknet::setup(net, labels.size(), img_size);
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
         yolo = net;

@@ -235,10 +235,10 @@ namespace darknet
 
     // clang-format on
 
-    template <typename net_type> void setup(net_type& net, int num_classes = 80)
+    template <typename net_type> void setup(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
         // remove bias
-        set_all_bn_inputs_no_bias(net);
+        disable_duplicative_bias(net);
         // remove mean from input image
         visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
             l = input_rgb_image(0, 0, 0);
@@ -250,7 +250,7 @@ namespace darknet
         layer<ytag16, 1>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         layer<ytag32, 1>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         // allocate the network
-        matrix<rgb_pixel> image(416, 416);
+        matrix<rgb_pixel> image(img_size, img_size);
         net(image);
     }
 
