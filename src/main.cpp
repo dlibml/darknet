@@ -4,6 +4,7 @@
 #include "yolo.h"
 
 #include <dlib/cmd_line_parser.h>
+#include <dlib/dir_nav.h>
 #include <dlib/gui_widgets.h>
 
 template <typename net_type> auto detect(
@@ -46,6 +47,7 @@ try
     parser.add_option("fps", "force frames per second (default: 30)", 1);
     parser.add_option("print", "print out the network architecture");
     parser.add_option("save", "save network weights in dlib format", 1);
+    parser.add_option("dnn", "path to dlib saved model", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias for --help");
     parser.add_option("help", "display this message and exit");
@@ -58,6 +60,8 @@ try
     }
 
     parser.check_incompatible_options("input", "webcam");
+    parser.check_incompatible_options("weights", "dnn");
+    parser.check_sub_option("weights", "save");
 
     const std::string weights_path = dlib::get_option(parser, "weights", "");
     const std::string names_path = dlib::get_option(parser, "names", "");
@@ -66,7 +70,8 @@ try
     const long img_size = dlib::get_option(parser, "img-size", 416);
     const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
     const float nms_thresh = dlib::get_option(parser, "nms-thresh", 0.45);
-    if (weights_path.empty())
+    const std::string dnn_path = dlib::get_option(parser, "dnn", "");
+    if (weights_path.empty() and dnn_path.empty())
     {
         std::cout << "Please provide a path to the trained weights\n";
         return EXIT_FAILURE;
@@ -88,20 +93,31 @@ try
     std::cout << "found " << labels.size() << " classes\n";
 
     darknet::yolov4_sam_mish_infer yolo;
+    if (dlib::file_exists(weights_path))
     {
         darknet::yolov4_sam_mish_train net;
         darknet::setup(net, labels.size(), img_size);
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
         yolo = net;
-        if (parser.option("print"))
-            std::cout << yolo << '\n';
         if (parser.option("save"))
         {
             yolo.clean();
             dlib::serialize(parser.option("save").argument()) << yolo;
         }
     }
+    else if (dlib::file_exists(dnn_path))
+    {
+        dlib::deserialize(dnn_path) >> yolo;
+    }
+    else
+    {
+        std::cout << "ERROR: could not find the network file: "
+                  << (dnn_path.empty() ? weights_path : dnn_path) << '\n';
+        return EXIT_FAILURE;
+    }
+    if (parser.option("print"))
+        std::cout << yolo << '\n';
 
     bool mirror = false;
     const std::string out_path = dlib::get_option(parser, "output", "");
@@ -137,7 +153,7 @@ try
     dlib::image_window win;
     win.set_title("YOLO");
     const auto label_to_color = get_color_map(labels);
-    dlib::running_stats_decayed<float> rs;
+    dlib::running_stats_decayed<float> rs(100);
     std::cout << std::fixed << std::setprecision(2);
     while (not win.is_closed())
     {
