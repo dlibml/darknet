@@ -45,6 +45,7 @@ try
     parser.add_option("nms-thresh", "non-max suppression threshold (default: 0.45)", 1);
     parser.add_option("fps", "force frames per second (default: 30)", 1);
     parser.add_option("print", "print out the network architecture");
+    parser.add_option("save", "save network weights in dlib format", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias for --help");
     parser.add_option("help", "display this message and exit");
@@ -95,6 +96,11 @@ try
         yolo = net;
         if (parser.option("print"))
             std::cout << yolo << '\n';
+        if (parser.option("save"))
+        {
+            yolo.clean();
+            dlib::serialize(parser.option("save").argument()) << yolo;
+        }
     }
 
     bool mirror = false;

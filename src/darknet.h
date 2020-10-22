@@ -79,22 +79,22 @@ namespace darknet
        template <typename SUBNET> using resv4_512 = resv4<512, SUBNET>;
 
         template <long nf, long factor, size_t N, template <typename> class RES, typename SUBNET>
-        using block = conblock<nf * factor, 1, 1,
-                      concat2<tag1, tag2,
-                      tag1<conblock<nf, 1, 1,
-                      repeat<N, RES,
-                      conblock<nf, 1, 1,
-                      skip1<
-                      tag2<conblock<nf, 1, 1,
-                      tag1<conblock<nf * factor, 3, 2,
-                      SUBNET>>>>>>>>>>>;
+        using cspblock = conblock<nf * factor, 1, 1,
+                         concat2<tag1, tag2,
+                         tag1<conblock<nf, 1, 1,
+                         repeat<N, RES,
+                         conblock<nf, 1, 1,
+                         skip1<
+                         tag2<conblock<nf, 1, 1,
+                         tag1<conblock<nf * factor, 3, 2,
+                         SUBNET>>>>>>>>>>>;
 
         template <typename INPUT>
-        using backbone53csp = block<512, 2, 4, resv4_512,
-                       btag16<block<256, 2, 8, resv4_256,
-                        btag8<block<128, 2, 8, resv4_128,
-                              block<64, 2, 2, resv4_64,
-                              block<64, 1, 1, resv3_64,
+        using backbone53csp = cspblock<512, 2, 4, resv4_512,
+                       btag16<cspblock<256, 2, 8, resv4_256,
+                        btag8<cspblock<128, 2, 8, resv4_128,
+                              cspblock<64, 2, 2, resv4_64,
+                              cspblock<64, 1, 1, resv3_64,
                               conblock<32, 3, 1,
                               INPUT>>>>>>>>;
 
