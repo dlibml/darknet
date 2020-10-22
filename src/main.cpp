@@ -37,6 +37,7 @@ try
     dlib::command_line_parser parser;
     parser.add_option("input", "path to video file to process (defaults to webcam)", 1);
     parser.add_option("output", "path to output video file (.mkv extension)", 1);
+    parser.add_option("webcam", "index of webcam to use (default: 0)", 1);
     parser.add_option("names", "path to file with label names (one per line)", 1);
     parser.add_option("weights", "path to the darknet trained weights", 1);
     parser.add_option("img-size", "image size to process (default: 416)", 1);
@@ -54,8 +55,11 @@ try
         return EXIT_SUCCESS;
     }
 
+    parser.check_incompatible_options("input", "webcam");
+
     const std::string weights_path = dlib::get_option(parser, "weights", "");
     const std::string names_path = dlib::get_option(parser, "names", "");
+    const int webcam_idx = dlib::get_option(parser, "webcam", 0);
     float fps = dlib::get_option(parser, "fps", 30);
     const long img_size = dlib::get_option(parser, "img-size", 416);
     const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
@@ -106,7 +110,7 @@ try
     else
     {
         mirror = true;
-        cv::VideoCapture cap(0);
+        cv::VideoCapture cap(webcam_idx);
         cap.set(cv::CAP_PROP_FPS, fps);
         vid_src = cap;
     }
@@ -126,6 +130,7 @@ try
     win.set_title("YOLO");
     const auto label_to_color = get_color_map(labels);
     dlib::running_stats_decayed<float> rs;
+    std::cout << std::fixed << std::setprecision(2);
     while (not win.is_closed())
     {
         dlib::matrix<dlib::rgb_pixel> image;
