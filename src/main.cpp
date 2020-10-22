@@ -44,6 +44,7 @@ try
     parser.add_option("conf-thresh", "confidence threshold (default: 0.25)", 1);
     parser.add_option("nms-thresh", "non-max suppression threshold (default: 0.45)", 1);
     parser.add_option("fps", "force frames per second (default: 30)", 1);
+    parser.add_option("print", "print out the network architecture");
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias for --help");
     parser.add_option("help", "display this message and exit");
@@ -92,7 +93,8 @@ try
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
         yolo = net;
-        // std::cout << yolo << '\n';
+        if (parser.option("print"))
+            std::cout << yolo << '\n';
     }
 
     bool mirror = false;
