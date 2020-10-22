@@ -40,30 +40,37 @@ namespace darknet
     struct def
     {
         template <long nf, long ks, int s, typename SUBNET>
-        using convolutional = ACT<BN<add_layer<con_<nf, ks, ks, s, s, ks/2, ks/2>, SUBNET>>>;
+        using conblock = ACT<BN<add_layer<con_<nf, ks, ks, s, s, ks/2, ks/2>, SUBNET>>>;
 
         template <long nf1, long nf2, typename SUBNET>
         using residual = add_prev1<
-                         convolutional<nf1, 3, 1,
-                         convolutional<nf2, 1, 1,
+                         conblock<nf1, 3, 1,
+                         conblock<nf2, 1, 1,
                          tag1<SUBNET>>>>;
+
+        template <long nf, typename SUBNET>
+        using conblock5 = conblock<nf, 1, 1,
+                          conblock<nf * 2, 3, 1,
+                          conblock<nf, 1, 1,
+                          conblock<nf * 2, 3, 1,
+                          conblock<nf, 1, 1, SUBNET>>>>>;
 
         template <long nf, typename SUBNET> using resv3 = residual<nf, nf / 2, SUBNET>;
         template <long nf, typename SUBNET> using resv4 = residual<nf, nf, SUBNET>;
 
-        template <typename SUBNET> using resv3_64 = resv3<64, SUBNET>;
+        template <typename SUBNET> using resv3_64= resv3<64, SUBNET>;
         template <typename SUBNET> using resv3_128 = resv3<128, SUBNET>;
         template <typename SUBNET> using resv3_256 = resv3<256, SUBNET>;
         template <typename SUBNET> using resv3_512 = resv3<512, SUBNET>;
         template <typename SUBNET> using resv3_1024 = resv3<1024, SUBNET>;
 
         template <typename INPUT>
-        using backbone53 = repeat<4, resv3_1024, convolutional<1024, 3, 2,
-                    btag16<repeat<8, resv3_512,  convolutional<512, 3, 2,
-                    btag8< repeat<8, resv3_256,  convolutional<256, 3, 2,
-                           repeat<2, resv3_128,  convolutional<128, 3, 2,
-                                     resv3< 64,  convolutional<64, 3, 2,
-                                                 convolutional<32, 3, 1,
+        using backbone53 = repeat<4, resv3_1024, conblock<1024, 3, 2,
+                    btag16<repeat<8, resv3_512,  conblock<512, 3, 2,
+                     btag8<repeat<8, resv3_256,  conblock<256, 3, 2,
+                           repeat<2, resv3_128,  conblock<128, 3, 2,
+                                     resv3_64<   conblock<64, 3, 2,
+                                                 conblock<32, 3, 1,
                                                  INPUT>>>>>>>>>>>>>;
 
        template <typename SUBNET> using resv4_64= resv4<64, SUBNET>;
@@ -72,23 +79,23 @@ namespace darknet
        template <typename SUBNET> using resv4_512 = resv4<512, SUBNET>;
 
         template <long nf, long factor, size_t N, template <typename> class RES, typename SUBNET>
-        using block = convolutional<nf * factor, 1, 1,
+        using block = conblock<nf * factor, 1, 1,
                       concat2<tag1, tag2,
-                      tag1<convolutional<nf, 1, 1,
+                      tag1<conblock<nf, 1, 1,
                       repeat<N, RES,
-                      convolutional<nf, 1, 1,
+                      conblock<nf, 1, 1,
                       skip1<
-                      tag2<convolutional<nf, 1, 1,
-                      tag1<convolutional<nf * factor, 3, 2,
+                      tag2<conblock<nf, 1, 1,
+                      tag1<conblock<nf * factor, 3, 2,
                       SUBNET>>>>>>>>>>>;
 
         template <typename INPUT>
         using backbone53csp = block<512, 2, 4, resv4_512,
                        btag16<block<256, 2, 8, resv4_256,
-                         tag8<block<128, 2, 8, resv4_128,
+                        btag8<block<128, 2, 8, resv4_128,
                               block<64, 2, 2, resv4_64,
                               block<64, 1, 1, resv3_64,
-                              convolutional<32, 3, 1,
+                              conblock<32, 3, 1,
                               INPUT>>>>>>>>;
 
         template <typename SUBNET>
@@ -98,41 +105,37 @@ namespace darknet
                     tag3<max_pool<9, 9, 1, 1,       // 110
                     skip1<                          // 109
                     tag2<max_pool<5, 5, 1, 1,       // 108
-                    tag1<convolutional<512, 1, 1,   // 107
-                    convolutional<1024, 3, 1,       // 106
-                    convolutional<512, 1, 1,        // 105
+                    tag1<conblock<512, 1, 1,   // 107
+                    conblock<1024, 3, 1,       // 106
+                    conblock<512, 1, 1,        // 105
                     SUBNET>>>>>>>>>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
         using yolo = YTAG<con<3*(classes + 5), 1, 1, 1, 1,
-                     convolutional<nf, 3, 1,
-                     NTAG<convolutional<nf/2, 1, 1,
-                     convolutional<nf,   3, 1,
-                     convolutional<nf/2, 1, 1,
-                     convolutional<nf,   3, 1,
-                     convolutional<nf/2, 1, 1,
-                     SUBNET>>>>>>>>>;
+                     conblock<nf, 3, 1,
+                     NTAG<conblock5<nf / 2,
+                     SUBNET>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
         using yolo_sam = YTAG<con<3*(classes + 5), 1, 1, 1, 1,
-                         convolutional<nf, 3, 1,
-                         NTAG<convolutional<nf/2, 1, 1,
+                         conblock<nf, 3, 1,
+                         NTAG<conblock<nf/2, 1, 1,
                          mult_prev1<
                          sig<bn_con<con<nf, 1, 1, 1, 1,
-                         tag1<convolutional<nf, 3, 1,
-                         convolutional<nf/2, 1, 1,
-                         convolutional<nf,   3, 1,
-                         convolutional<nf/2, 1, 1,
+                         tag1<conblock<nf, 3, 1,
+                         conblock<nf/2, 1, 1,
+                         conblock<nf,   3, 1,
+                         conblock<nf/2, 1, 1,
                          SUBNET>>>>>>>>>>>>>>;
 
         template <int classes>
         using yolov3 = yolo<256, classes, ytag8, ntag8,
                        concat2<htag8, btag8,
-                       htag8<upsample<2, convolutional<128, 1, 1,
+                       htag8<upsample<2, conblock<128, 1, 1,
                        nskip16<
                        yolo<512, classes, ytag16, ntag16,
                        concat2<htag16, btag16,
-                       htag16<upsample<2, convolutional<256, 1, 1,
+                       htag16<upsample<2, conblock<256, 1, 1,
                        nskip32<
                        yolo<1024, classes, ytag32, ntag32,
                        backbone53<tag1<input_rgb_image>>
@@ -141,62 +144,54 @@ namespace darknet
         template <int classes, typename SUBNET>
         using yolov4 = yolo<1024, classes, ytag32, ntag32,  // 161
                        concat2<htag32, ntag32,              // 153
-                       htag32<convolutional<512, 3, 2,      // 152
+                       htag32<conblock<512, 3, 2,           // 152
                        nskip16<                             // 151
                        yolo<512, classes, ytag16, ntag16,   // 150
                        concat2<htag16, ntag16,              // 142
-                       htag16<convolutional<256, 3, 2,      // 141
+                       htag16<conblock<256, 3, 2,           // 141
                        nskip8<                              // 140
                        yolo<256, classes, ytag8, ntag8,     // 139
                        concat2<tag1, tag2,                  // 131
-                       tag1<convolutional<128, 1, 1,        // 130
+                       tag1<conblock<128, 1, 1,             // 130
                        bskip8<                              // 129
                        tag2<upsample<2,                     // 128
-                       convolutional<128, 1, 1,             // 127
-                       ntag16<convolutional<256, 1, 1,      // 126
-                       convolutional<512, 3, 1,             // 125
-                       convolutional<256, 1, 1,             // 124
-                       convolutional<512, 3, 1,             // 123
-                       convolutional<256, 1, 1,             // 122
+                       conblock<128, 1, 1,                  // 127
+                       ntag16<conblock5<256,                // 126
                        concat2<tag1, tag2,                  // 121
-                       tag1<convolutional<256, 1, 1,        // 120
+                       tag1<conblock<256, 1, 1,             // 120
                        bskip16<                             // 119
                        tag2<upsample<2,                     // 118
-                       convolutional<256, 1, 1,             // 117
-                       ntag32<convolutional<512, 1, 1,      // 116
-                       convolutional<1024, 3, 1,            // 115
-                       convolutional<512, 1, 1,             // 114
-                       spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                       conblock<256, 1, 1,                  // 117
+                       ntag32<conblock<512, 1, 1,           // 116
+                       conblock<1024, 3, 1,                 // 115
+                       conblock<512, 1, 1,                  // 114
+                       spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <int classes, typename SUBNET>
         using yolov4_sam = yolo_sam<1024, classes, ytag32, ntag32,  // 161
                            concat2<htag32, ntag32,                  // 153
-                           htag32<convolutional<512, 3, 2,          // 152
+                           htag32<conblock<512, 3, 2,               // 152
                            nskip16<                                 // 151
                            yolo_sam<512, classes, ytag16, ntag16,   // 150
                            concat2<htag16, ntag16,                  // 142
-                           htag16<convolutional<256, 3, 2,          // 141
+                           htag16<conblock<256, 3, 2,               // 141
                            nskip8<                                  // 140
                            yolo_sam<256, classes, ytag8, ntag8,     // 139
                            concat2<tag1, tag2,                      // 131
-                           tag1<convolutional<128, 1, 1,            // 130
+                           tag1<conblock<128, 1, 1,                 // 130
                            bskip8<                                  // 129
                            tag2<upsample<2,                         // 128
-                           convolutional<128, 1, 1,                 // 127
-                           ntag16<convolutional<256, 1, 1,          // 126
-                           convolutional<512, 3, 1,                 // 125
-                           convolutional<256, 1, 1,                 // 124
-                           convolutional<512, 3, 1,                 // 123
-                           convolutional<256, 1, 1,                 // 122
+                           conblock<128, 1, 1,                      // 127
+                           ntag16<conblock5<256,                    // 126
                            concat2<tag1, tag2,                      // 121
-                           tag1<convolutional<256, 1, 1,            // 120
+                           tag1<conblock<256, 1, 1,                 // 120
                            bskip16<                                 // 119
                            tag2<upsample<2,                         // 118
-                           convolutional<256, 1, 1,                 // 117
-                           ntag32<convolutional<512, 1, 1,          // 116
-                           convolutional<1024, 3, 1,                // 115
-                           convolutional<512, 1, 1,                 // 114
-                           spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                           conblock<256, 1, 1,                      // 117
+                           ntag32<conblock<512, 1, 1,               // 116
+                           conblock<1024, 3, 1,                     // 115
+                           conblock<512, 1, 1,                      // 114
+                           spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
     };
 
