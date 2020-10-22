@@ -51,6 +51,7 @@ namespace darknet
         template <long nf, typename SUBNET> using resv3 = residual<nf, nf / 2, SUBNET>;
         template <long nf, typename SUBNET> using resv4 = residual<nf, nf, SUBNET>;
 
+        template <typename SUBNET> using resv3_64 = resv3<64, SUBNET>;
         template <typename SUBNET> using resv3_128 = resv3<128, SUBNET>;
         template <typename SUBNET> using resv3_256 = resv3<256, SUBNET>;
         template <typename SUBNET> using resv3_512 = resv3<512, SUBNET>;
@@ -70,50 +71,25 @@ namespace darknet
        template <typename SUBNET> using resv4_256 = resv4<256, SUBNET>;
        template <typename SUBNET> using resv4_512 = resv4<512, SUBNET>;
 
+        template <long nf, long factor, size_t N, template <typename> class RES, typename SUBNET>
+        using block = convolutional<nf * factor, 1, 1,
+                      concat2<tag1, tag2,
+                      tag1<convolutional<nf, 1, 1,
+                      repeat<N, RES,
+                      convolutional<nf, 1, 1,
+                      skip1<
+                      tag2<convolutional<nf, 1, 1,
+                      tag1<convolutional<nf * factor, 3, 2,
+                      SUBNET>>>>>>>>>>>;
+
         template <typename INPUT>
-        using backbone53csp = convolutional<1024, 1, 1,       // 104
-                              concat2<tag1, tag2,             // 103
-                              tag1<convolutional<512, 1, 1,   // 102
-                              repeat<4, resv4_512,            // 101
-                              convolutional<512, 1, 1,        // 89
-                              skip1<                          // 88
-                              tag2<convolutional<512, 1, 1,   // 87
-                              tag1<convolutional<1024, 3, 2,  // 86
-                              btag16<convolutional<512, 1, 1, // 85
-                              concat2<tag1, tag2,             // 84
-                              tag1<convolutional<256, 1, 1,   // 83
-                              repeat<8, resv4_256,            // 82
-                              convolutional<256, 1, 1,        // 58
-                              skip1<                          // 57
-                              tag2<convolutional<256, 1, 1,   // 56
-                              tag1<convolutional<512, 3, 2,   // 55
-                              btag8<convolutional<256, 1, 1,  // 54
-                              concat2<tag1, tag2,             // 53
-                              tag1<convolutional<128, 1, 1,   // 52
-                              repeat<8, resv4_128,            // 51
-                              convolutional<128, 1, 1,        // 27
-                              skip1<                          // 26
-                              tag2<convolutional<128, 1, 1,   // 25
-                              tag1<convolutional<256, 3, 2,   // 24
-                              convolutional<128, 1, 1,        // 23
-                              concat2<tag1, tag2,             // 22
-                              tag1<convolutional<64, 1, 1,    // 21
-                              repeat<2, resv4_64,             // 20
-                              convolutional<64, 1, 1,         // 14
-                              skip1<                          // 13
-                              tag2<convolutional<64, 1, 1,    // 12
-                              tag1<convolutional<128, 3, 2,   // 11
-                              convolutional<64, 1, 1,         // 10
-                              concat2<tag1, tag2,             // 9
-                              tag1<convolutional<64, 1, 1,    // 8
-                              resv3<64,                       // 7
-                              convolutional<64, 1, 1,         // 4
-                              skip1<                          // 3
-                              tag2<convolutional<64, 1, 1,    // 2
-                              tag1<convolutional<64, 3, 2,    // 1
-                              convolutional<32, 3, 1,         // 0
-                              INPUT>>>>>>>>>>>>>>>>>>>>>>>>>>
-                              >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+        using backbone53csp = block<512, 2, 4, resv4_512,
+                       btag16<block<256, 2, 8, resv4_256,
+                         tag8<block<128, 2, 8, resv4_128,
+                              block<64, 2, 2, resv4_64,
+                              block<64, 1, 1, resv3_64,
+                              convolutional<32, 3, 1,
+                              INPUT>>>>>>>>;
 
         template <typename SUBNET>
         using spp = concat4<tag4, tag3, tag2, tag1, // 113
