@@ -41,39 +41,35 @@ namespace darknet
             DLIB_CASSERT(bn_t.size() == (g.size() + b.size()) && g.size() == b.size());
 
             const auto num_b = bn_t.size() / 2;
-            auto temp_b = resizable_tensor(1, num_b);
-            auto temp_g = resizable_tensor(1, num_b);
-            auto temp_m = resizable_tensor(1, num_b);
-            auto temp_v = resizable_tensor(1, num_b);
 
             // bn bias
-            float* ptr = temp_b.host();
+            matrix<float> temp_b(1, num_b);
             for (size_t i = 0; i < num_b; ++i)
-                (*this) >> ptr[i];
+                (*this) >> temp_b(i);
 
             // bn weights
-            ptr = temp_g.host();
+            matrix<float> temp_g(1, num_b);
             for (size_t i = 0; i < num_b; ++i)
-                (*this) >> ptr[i];
+                (*this) >> temp_g(i);
 
             // bn running mean
-            ptr = temp_m.host();
+            matrix<float> temp_m(1, num_b);
             for (size_t i = 0; i < num_b; ++i)
-                (*this) >> ptr[i];
+                (*this) >> temp_m(i);
 
             // bn running var
-            ptr = temp_v.host();
+            matrix<float> temp_v(1, num_b);
             for (size_t i = 0; i < num_b; ++i)
-                (*this) >> ptr[i];
+                (*this) >> temp_v(i);
 
-            g = pointwise_divide(mat(temp_g), sqrt(mat(temp_v) + DEFAULT_BATCH_NORM_EPS));
-            b = mat(temp_b) - pointwise_multiply(mat(g), mat(temp_m));
+            g = pointwise_divide(temp_g, sqrt(temp_v + DEFAULT_BATCH_NORM_EPS));
+            b = temp_b - pointwise_multiply(mat(g), temp_m);
 
             // conv weight
             auto& conv = l.subnet().layer_details();
             auto& conv_t = conv.get_layer_params();
             DLIB_CASSERT(conv.bias_is_disabled());
-            ptr = conv_t.host();
+            float* ptr = conv_t.host();
             for (size_t i = 0; i < conv_t.size(); ++i)
                 (*this) >> ptr[i];
         }
