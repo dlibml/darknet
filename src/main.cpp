@@ -5,7 +5,6 @@
 
 #include <dlib/cmd_line_parser.h>
 #include <dlib/dir_nav.h>
-#include <dlib/gui_widgets.h>
 
 template <typename net_type> auto detect(
     net_type& net,
@@ -56,6 +55,7 @@ try
     if (parser.option("h") or parser.option("help"))
     {
         parser.print_options();
+        webcam_window::print_keyboard_shortcuts();
         return EXIT_SUCCESS;
     }
 
@@ -119,7 +119,8 @@ try
     if (parser.option("print"))
         std::cout << yolo << '\n';
 
-    bool mirror = false;
+    webcam_window win;
+    win.conf_thresh = conf_thresh;
     const std::string out_path = dlib::get_option(parser, "output", "");
     cv::VideoCapture vid_src;
     cv::VideoWriter vid_snk;
@@ -130,13 +131,14 @@ try
         if (not parser.option("fps"))
             fps = file.get(cv::CAP_PROP_FPS);
         vid_src = file;
+        win.mirror = false;
     }
     else
     {
-        mirror = true;
         cv::VideoCapture cap(webcam_idx);
         cap.set(cv::CAP_PROP_FPS, fps);
         vid_src = cap;
+        win.mirror = true;
     }
     int width, height;
     {
@@ -150,8 +152,6 @@ try
         vid_snk = cv::VideoWriter(out_path, cv::VideoWriter::fourcc('X', '2', '6', '4'), fps, cv::Size(width, height));
     }
 
-    dlib::image_window win;
-    win.set_title("YOLO");
     const auto label_to_color = get_color_map(labels);
     dlib::running_stats_decayed<float> rs(100);
     std::cout << std::fixed << std::setprecision(2);
@@ -165,13 +165,13 @@ try
         }
         // convert the BRG opencv image to RGB dlib image
         const dlib::cv_image<dlib::bgr_pixel> tmp(cv_cap);
-        if (mirror)
+        if (win.mirror)
             dlib::flip_image_left_right(tmp, image);
         else
             dlib::assign_image(image, tmp);
         win.clear_overlay();
         const auto t0 = std::chrono::steady_clock::now();
-        const auto detections = detect(yolo, image, labels, conf_thresh, nms_thresh, img_size);
+        const auto detections = detect(yolo, image, labels, win.conf_thresh, nms_thresh, img_size);
         const auto t1 = std::chrono::steady_clock::now();
         rs.add(std::chrono::duration_cast<std::chrono::duration<float>>(t1 - t0).count());
         std::cout << "avg fps: " << 1.0f / rs.mean() << '\r' << std::flush;

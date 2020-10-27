@@ -3,6 +3,7 @@
 
 #include "yolo.h"
 
+#include <dlib/gui_widgets.h>
 #include <dlib/opencv.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -126,5 +127,60 @@ void render_bounding_boxes(
         }
     }
 }
+
+class webcam_window : public dlib::image_window
+{
+    public:
+    webcam_window()
+    {
+        update_title();
+    }
+    bool mirror = true;
+    float conf_thresh = 0.25;
+
+    static void print_keyboard_shortcuts()
+    {
+        std::cout << "Keyboard shortcuts:" << std::endl;
+        std::cout << "  h                   Display keyboard shortcuts" << std::endl;
+        std::cout << "  m                   Toggle mirror mode" << std::endl;
+        std::cout << "  +                   Increase confidence threshold by 0.005" << std::endl;
+        std::cout << "  -                   Decrease confidence threshold by 0.005" << std::endl;
+        std::cout << "  q                   Quit the application" << std::endl;
+        std::cout << std::endl;
+    }
+
+    private:
+    void update_title()
+    {
+        std::ostringstream sout;
+        sout << "YOLO @" << std::setprecision(3) << std::fixed << conf_thresh;
+        set_title(sout.str());
+    }
+    void on_keydown(unsigned long key, bool /*is_printable*/, unsigned long /*state*/) override
+    {
+        switch (key)
+        {
+            case 'h':
+                print_keyboard_shortcuts();
+                break;
+            case 'm':
+                mirror = !mirror;
+                break;
+            case '+':
+                conf_thresh += 0.005;
+                update_title();
+                break;
+            case '-':
+                conf_thresh -= 0.005;
+                update_title();
+                break;
+            case 'q':
+                close_window();
+                break;
+            default:
+                break;
+        }
+    }
+};
 
 #endif  // src/ui_utils_h_INCLUDED
