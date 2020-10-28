@@ -143,8 +143,8 @@ class webcam_window : public dlib::image_window
         std::cout << "Keyboard shortcuts:" << std::endl;
         std::cout << "  h                   Display keyboard shortcuts" << std::endl;
         std::cout << "  m                   Toggle mirror mode" << std::endl;
-        std::cout << "  +                   Increase confidence threshold by 0.005" << std::endl;
-        std::cout << "  -                   Decrease confidence threshold by 0.005" << std::endl;
+        std::cout << "  +, k                Increase confidence threshold by 0.05" << std::endl;
+        std::cout << "  -, j                Decrease confidence threshold by 0.05" << std::endl;
         std::cout << "  q                   Quit the application" << std::endl;
         std::cout << std::endl;
     }
@@ -153,7 +153,7 @@ class webcam_window : public dlib::image_window
     void update_title()
     {
         std::ostringstream sout;
-        sout << "YOLO @" << std::setprecision(3) << std::fixed << conf_thresh;
+        sout << "YOLO @" << std::setprecision(2) << std::fixed << conf_thresh;
         set_title(sout.str());
     }
     void on_keydown(unsigned long key, bool /*is_printable*/, unsigned long /*state*/) override
@@ -167,11 +167,13 @@ class webcam_window : public dlib::image_window
                 mirror = !mirror;
                 break;
             case '+':
-                conf_thresh += 0.005;
+            case 'k':
+                conf_thresh = std::min(conf_thresh + 0.05f, 1.0f);
                 update_title();
                 break;
             case '-':
-                conf_thresh -= 0.005;
+            case 'j':
+                conf_thresh = std::max(conf_thresh - 0.05f, 0.05f);
                 update_title();
                 break;
             case 'q':

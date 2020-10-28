@@ -153,7 +153,7 @@ try
     }
 
     const auto label_to_color = get_color_map(labels);
-    dlib::running_stats_decayed<float> rs(100);
+    dlib::running_stats_decayed<float> rs(10);
     std::cout << std::fixed << std::setprecision(2);
     while (not win.is_closed())
     {
