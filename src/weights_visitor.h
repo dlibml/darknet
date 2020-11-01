@@ -15,7 +15,7 @@ namespace darknet
             int32_t batches_seen1;
             int64_t batches_seen2;
             (*this) >> major >> minor >> revision;
-            std::cout << "weights file '" << darknet_weights << "', major " << major << ", minor " << minor << ", revision " << revision << ", batches seen ";
+            std::cout << "weights file '" << weights_path << "', major " << major << ", minor " << minor << ", revision " << revision << ", batches seen ";
 
             if ((major * 10 + minor) >= 2 && major < 1000 && minor < 1000) {
                 (*this) >> batches_seen2;
