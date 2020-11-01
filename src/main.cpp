@@ -96,7 +96,7 @@ try
     if (dlib::file_exists(weights_path))
     {
         darknet::yolov4_sam_mish_train net;
-        darknet::setup(net, labels.size(), img_size);
+        darknet::setup_detector(net, labels.size(), img_size);
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
         yolo = net;

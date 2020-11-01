@@ -11,14 +11,21 @@ namespace darknet
         public:
         weights_visitor(const std::string& weights_path) : weights(read_bytes(weights_path))
         {
-            int major = 0, minor = 0, dummy = 0;
-            (*this) >> major >> minor >> dummy;
-            if ((major * 10 + minor) >= 2 and major < 1000 and minor < 1000)
-                (*this) >> dummy >> dummy;
-            else
-                (*this) >> dummy;
-            std::cout << "weights file major: " << major << ", minor: " << minor
-                      << ", num weights: " << weights.size() << '\n';
+            int32_t major = 0, minor = 0, revision = 0;
+            int32_t batches_seen1;
+            int64_t batches_seen2;
+            (*this) >> major >> minor >> revision;
+            std::cout << "weights file '" << darknet_weights << "', major " << major << ", minor " << minor << ", revision " << revision << ", batches seen ";
+
+            if ((major * 10 + minor) >= 2 && major < 1000 && minor < 1000) {
+                (*this) >> batches_seen2;
+                std::cout << batches_seen2;
+            } else {
+                (*this) >> batches_seen1;
+                std::cout << batches_seen1;
+            }
+
+            std::cout << ", num weights " << w.size() << std::endl;
         }
 
         ~weights_visitor()
@@ -104,6 +111,49 @@ namespace darknet
                 for (size_t i = 0; i < f.size(); ++i)
                     (*this) >> ptr[i];
             }
+        }
+        
+        // fully connected layers
+        template <unsigned long num_outputs, fc_bias_mode bias_mode, typename SUBNET>
+        void operator()(size_t idx, add_layer<fc_<num_outputs,bias_mode>,SUBNET>& l)
+        {
+            //1. fc bias
+            //2. fc weight
+            const auto& sub_output = l.subnet().get_output();
+            const int num_inputs = sub_output.nr()*sub_output.nc()*sub_output.k();
+
+            auto& fc = l.layer_details();
+            auto& params       = fc.get_layer_params();
+            auto filters_alias = alias_tensor(num_inputs, num_outputs);
+            auto filters       = filters_alias(params,0);
+
+            if (!fc.bias_is_disabled())
+            {
+                auto biases_alias = alias_tensor(1,num_outputs);
+                auto biases       = biases_alias(params, filters.size());
+
+                //bias
+                float* ptr = biases.host();
+                for (size_t i = 0 ; i < biases.size() ; i++)
+                    (*this) >> ptr[i];
+            }
+
+            //weights - For some reason dlib's fc layer does not use the normal convention for storing weights.
+            //          Usually the filters would have dimensions [num_outputs,num_inputs], but dlib uses [num_inputs,num_outputs]
+            //          So me must transpose from darknet
+            matrix<float> temp_f(num_outputs, num_inputs);
+            for (size_t y = 0 ; y < temp_f.nr() ; y++) //num_outputs
+                for (size_t x = 0 ; x < temp_f.nc() ; x++) //num_inputs
+                    (*this) >> temp_f(y,x);
+
+            //You don't need to do the following, instead you could modify the order of the for-loops that follow.
+            //But this makes our intentions explicit.
+            temp_f = trans(temp_f);
+
+            float* ptr = filters.host();
+            for (size_t y = 0 ; y < temp_f.nr() ; y++) //num_inputs
+                for (size_t x = 0 ; x < temp_f.nc() ; x++) //num_outputs
+                    ptr[y*temp_f.nc() + x] = temp_f(y,x);
         }
 
         private:
