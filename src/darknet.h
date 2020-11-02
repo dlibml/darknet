@@ -206,7 +206,7 @@ namespace darknet
 
     // clang-format on
 
-    template <typename net_type> void setup(net_type& net, int num_classes = 80, size_t img_size = 416)
+    template <typename net_type> void setup_detector(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
         // remove bias
         disable_duplicative_bias(net);
@@ -220,6 +220,23 @@ namespace darknet
         layer<ytag8, 1>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         layer<ytag16, 1>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         layer<ytag32, 1>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        // allocate the network
+        matrix<rgb_pixel> image(img_size, img_size);
+        net(image);
+    }
+    
+    template <typename net_type> void setup_classifier(net_type& net, int num_classes = 1000, size_t img_size = 416)
+    {
+        // remove bias
+        disable_duplicative_bias(net);
+        // remove mean from input image
+        visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
+            l = input_rgb_image(0, 0, 0);
+        });
+        // setup leaky relus
+        visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
+        // set the number of filters
+        layer<1>(net).layer_details().set_num_outputs(num_classes);
         // allocate the network
         matrix<rgb_pixel> image(img_size, img_size);
         net(image);
