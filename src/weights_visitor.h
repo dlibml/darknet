@@ -25,7 +25,7 @@ namespace darknet
                 std::cout << batches_seen1;
             }
 
-            std::cout << ", num weights " << w.size() << std::endl;
+            std::cout << ", num weights " << weights.size() << std::endl;
         }
 
         ~weights_visitor()
