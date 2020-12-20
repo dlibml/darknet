@@ -120,17 +120,17 @@ void add_detections(
             for (long x = 0; x < t.nc(); ++x)
             {
                 detection d;
-                d.x = (sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 0, y, x)]) + x) / t.nc();
-                d.y = (sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 1, y, x)]) + y) / t.nr();
+                d.x = ((out[dlib::tensor_index(t, 0, a * nattr + 0, y, x)]) + x) / t.nc();
+                d.y = ((out[dlib::tensor_index(t, 0, a * nattr + 1, y, x)]) + y) / t.nr();
                 d.w = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)]) * anchors[a].first / (t.nc() * stride);
                 d.h = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)]) * anchors[a].second / (t.nr() * stride);
-                d.obj = sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 4, y, x)]);
+                d.obj = out[dlib::tensor_index(t, 0, a * nattr + 4, y, x)];
 
                 if (d.obj > conf_thresh)
                 {
                     for (size_t p = 0; p < nclasses; ++p)
                     {
-                        const float temp = sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)]);
+                        const float temp = out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)];
                         if (temp > d.score)
                         {
                             d.score = temp;

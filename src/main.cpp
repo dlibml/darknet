@@ -94,10 +94,10 @@ try
     }
     std::cout << "found " << labels.size() << " classes\n";
 
-    darknet::yolov4_sam_mish_infer yolo;
+    darknet::yolov4x_mish_infer yolo;
     if (dlib::file_exists(weights_path))
     {
-        darknet::yolov4_sam_mish_train net;
+        darknet::yolov4x_mish_train net;
         darknet::setup_detector(net, labels.size(), img_size);
         std::cout << "#params: " << dlib::count_parameters(net) << '\n';
         dlib::visit_layers_backwards(net, darknet::weights_visitor(weights_path));
