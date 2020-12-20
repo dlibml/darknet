@@ -129,10 +129,9 @@ void add_detections(
                     d.w = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)]) * anchors[a].first / (t.nc() * stride);
                     d.h = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)]) * anchors[a].second / (t.nr() * stride);
                     d.obj = obj;
-                        
                     for (size_t p = 0; p < nclasses; ++p)
                     {
-                        const float temp = sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)]);
+                        const float temp = out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)];
                         if (temp > d.score)
                         {
                             d.score = temp;

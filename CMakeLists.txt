@@ -38,6 +38,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
     endif()
 endif()
 
+add_compile_options(-ftemplate-depth=2000)
+
 # Dependency management
 include(FetchContent)
 macro(fetch_content name tag repository)
