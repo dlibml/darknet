@@ -209,7 +209,7 @@ namespace darknet
     template <typename net_type> void setup_detector(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
         // remove bias
-        disable_duplicative_bias(net);
+        disable_duplicative_biases(net);
         // remove mean from input image
         visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
             l = input_rgb_image(0, 0, 0);
@@ -224,7 +224,7 @@ namespace darknet
         matrix<rgb_pixel> image(img_size, img_size);
         net(image);
     }
-    
+
     template <typename net_type> void setup_classifier(net_type& net, int num_classes = 1000, size_t img_size = 416)
     {
         // remove bias

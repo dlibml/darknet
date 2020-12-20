@@ -47,6 +47,7 @@ try
     parser.add_option("print", "print out the network architecture");
     parser.add_option("save", "save network weights in dlib format", 1);
     parser.add_option("dnn", "path to dlib saved model", 1);
+    parser.add_option("out-width", "set output width", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias for --help");
     parser.add_option("help", "display this message and exit");
@@ -71,6 +72,7 @@ try
     const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
     const float nms_thresh = dlib::get_option(parser, "nms-thresh", 0.45);
     const std::string dnn_path = dlib::get_option(parser, "dnn", "");
+    const long out_width = dlib::get_option(parser, "out-width", 0);
     if (weights_path.empty() and dnn_path.empty())
     {
         std::cout << "Please provide a path to the trained weights\n";
@@ -147,6 +149,11 @@ try
         width = cv_tmp.cols;
         height = cv_tmp.rows;
     }
+    if (out_width > 0)
+    {
+        height *= out_width / width;
+        width = out_width;
+    }
     if (not out_path.empty())
     {
         vid_snk = cv::VideoWriter(out_path, cv::VideoWriter::fourcc('X', '2', '6', '4'), fps, cv::Size(width, height));
@@ -175,6 +182,8 @@ try
         const auto t1 = std::chrono::steady_clock::now();
         rs.add(std::chrono::duration_cast<std::chrono::duration<float>>(t1 - t0).count());
         std::cout << "avg fps: " << 1.0f / rs.mean() << '\r' << std::flush;
+        if (out_width > 0)
+            dlib::resize_image(static_cast<double>(out_width) / image.nc(), image);
         render_bounding_boxes(image, detections, label_to_color);
         win.set_image(image);
         if (not out_path.empty())
