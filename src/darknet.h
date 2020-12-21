@@ -426,34 +426,21 @@ namespace darknet
     template <typename net_type>
     void setup_detector(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
-        std::cout << "setting up detector" << std::endl;
-        std::cout << "removing duplicative biases" << std::endl;
         // remove bias
         disable_duplicative_biases(net);
-        std::cout << "removing mean from input image" << std::endl;
         // remove mean from input image
         visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
             l = input_rgb_image(0, 0, 0);
         });
-        std::cout << "setting up leaky relus" << std::endl;
         // setup leaky relus
         visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
         // set the number of filters
-        std::cout << "setting up filters in stride 8" << std::endl;
         layer<ytag8, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag8, 2>(net).layer_details().disable_bias();
-        std::cout << "setting up filters in stride 16" << std::endl;
         layer<ytag16, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag16, 2>(net).layer_details().disable_bias();
-        std::cout << "setting up filters in stride 32" << std::endl;
         layer<ytag32, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag32, 2>(net).layer_details().disable_bias();
-        std::cout << "forwarding an image to allocate the network" << std::endl;
-        std::cout << net << std::endl;
         // allocate the network
         matrix<rgb_pixel> image(img_size, img_size);
         net(image);
-        std::cout << "setup done" << std::endl;
     }
 
     template <typename net_type>
