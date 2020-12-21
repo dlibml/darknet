@@ -24,9 +24,9 @@ template <typename net_type> auto detect(
     // add_detections(out8, {{10, 13}, {16, 30}, {33, 23}}, labels, 8, conf_thresh, detections);
     // add_detections(out16, {{30, 61}, {62, 45}, {59, 119}}, labels, 16, conf_thresh, detections);
     // add_detections(out32, {{116, 90}, {156, 198}, {373, 326}}, labels, 32, conf_thresh, detections);
-    add_detections(out8, {{12, 16}, {19, 36}, {40, 28}}, labels, 8, conf_thresh, detections);
-    add_detections(out16, {{36, 75}, {76, 55}, {72, 146}}, labels, 16, conf_thresh, detections);
-    add_detections(out32, {{142, 110}, {192, 243}, {459, 401}}, labels, 32, conf_thresh, detections);
+    add_detections(out8, {{12, 16}, {19, 36}, {40, 28}}, labels, 8, conf_thresh, detections, linear);
+    add_detections(out16, {{36, 75}, {76, 55}, {72, 146}}, labels, 16, conf_thresh, detections, linear);
+    add_detections(out32, {{142, 110}, {192, 243}, {459, 401}}, labels, 32, conf_thresh, detections, linear);
     nms(conf_thresh, nms_thresh, detections);
     return detections;
 }

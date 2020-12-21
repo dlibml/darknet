@@ -97,18 +97,26 @@ float iou(const detection& a, const detection& b, iout_t type)
     return ret;
 }
 
-float sigmoid(const float x)
+constexpr float sigmoid(const float x)
 {
     return 1.0f / (1.0f + std::exp(-x));
 }
 
+constexpr float linear(const float x)
+{
+    return x;
+}
+
+
+template<typename activation>
 void add_detections(
     const dlib::tensor& t,
     const std::vector<std::pair<float, float>>& anchors,
     const std::vector<std::string>& labels,
     const int stride,
     const float conf_thresh,
-    std::vector<detection>& detections)
+    std::vector<detection>& detections,
+    activation act = sigmoid)
 {
     const size_t nattr = t.k() / anchors.size();
     const size_t nclasses = nattr - 5;
@@ -131,7 +139,7 @@ void add_detections(
                     d.obj = obj;
                     for (size_t p = 0; p < nclasses; ++p)
                     {
-                        const float temp = out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)];
+                        const float temp = act(out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)]);
                         if (temp > d.score)
                         {
                             d.score = temp;
