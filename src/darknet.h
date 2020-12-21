@@ -193,41 +193,41 @@ namespace darknet
                            spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <typename INPUT>
-        using yolov4x = ytag32<				// 202
+        using yolov4x = ytag32<                         // 202
                         sig<con<255, 1, 1, 1, 1,        // 201
-                        conblock<1280, 3, 1, 		// 200
-                        conblock<640, 1, 1, 		// 199
+                        conblock<1280, 3, 1,            // 200
+                        conblock<640, 1, 1,             // 199
                         concat2<tag1, tag2, // 197 190  // 198
-                   tag1<conblock<640, 3, 1, 		// 197
-                        conblock<640, 1, 1, 		// 196
-                        conblock<640, 3, 1, 		// 195
-                        conblock<640, 1, 1, 		// 194
-                        conblock<640, 3, 1, 		// 193
-                        conblock<640, 1, 1, 		// 192
+                   tag1<conblock<640, 3, 1,             // 197
+                        conblock<640, 1, 1,             // 196
+                        conblock<640, 3, 1,             // 195
+                        conblock<640, 1, 1,             // 194
+                        conblock<640, 3, 1,             // 193
+                        conblock<640, 1, 1,             // 192
                         skip1< // 189                   // 191
-                   tag2<conblock<640, 1, 1, 		// 190
-                   tag1<conblock<640, 1, 1, 		// 189
+                   tag2<conblock<640, 1, 1,             // 190
+                   tag1<conblock<640, 1, 1,             // 189
                         concat2<tag1, tag9, // 187 133  // 188
-                   tag1<conblock<640, 3, 2,		// 187
-                        skip1<	// 182                  // 186
-                        ytag16<				// 185
+                   tag1<conblock<640, 3, 2,             // 187
+                        skip1< // 182                   // 186
+                        ytag16<                         // 185
                         sig<con<255, 1, 1, 1, 1,        // 184
-                        conblock<640, 3, 1,		// 183
-                   tag1<conblock<320, 1, 1,		// 182
+                        conblock<640, 3, 1,             // 183
+                   tag1<conblock<320, 1, 1,             // 182
                         concat2<tag1, tag2, // 180 173  // 181
-                   tag1<conblock<320, 3, 1,		// 180
-                        conblock<320, 1, 1,		// 179
-                        conblock<320, 3, 1,		// 178
-                        conblock<320, 1, 1,		// 177
-                        conblock<320, 3, 1,		// 176
-                        conblock<320, 1, 1,		// 175
+                   tag1<conblock<320, 3, 1,             // 180
+                        conblock<320, 1, 1,             // 179
+                        conblock<320, 3, 1,             // 178
+                        conblock<320, 1, 1,             // 177
+                        conblock<320, 3, 1,             // 176
+                        conblock<320, 1, 1,             // 175
                         skip1< // 172                   // 174
                    tag2<conblock<320, 1, 1,             // 173
-                   tag1<conblock<320, 1, 1,		// 172
+                   tag1<conblock<320, 1, 1,             // 172
                         concat2<tag1, tag8, // 170 149  // 171
-                   tag1<conblock<320, 3, 2, 		// 170
+                   tag1<conblock<320, 3, 2,             // 170
                         skip1< // 165                   // 169
-                        ytag8<				// 168
+                        ytag8<                          // 168
                         sig<con<255, 1, 1, 1, 1,        // 167
                         conblock<320, 3, 1,             // 166
                    tag1<conblock<160, 1, 1,             // 165
@@ -441,10 +441,13 @@ namespace darknet
         // set the number of filters
         std::cout << "setting up filters in stride 8" << std::endl;
         layer<ytag8, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag8, 2>(net).layer_details().disable_bias();
         std::cout << "setting up filters in stride 16" << std::endl;
         layer<ytag16, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag16, 2>(net).layer_details().disable_bias();
         std::cout << "setting up filters in stride 32" << std::endl;
         layer<ytag32, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag32, 2>(net).layer_details().disable_bias();
         std::cout << "forwarding an image to allocate the network" << std::endl;
         std::cout << net << std::endl;
         // allocate the network
