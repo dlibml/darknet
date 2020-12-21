@@ -337,7 +337,7 @@ namespace darknet
                    tag1<conblock<320, 1, 1,             // 61
                         skip1< // 58                    // 60
                    tag2<conblock<320, 1, 1,             // 59
-                   tag1<conblock<640, 3, 1,             // 58
+                   tag1<conblock<640, 3, 2,             // 58
                    tag7<conblock<320, 1, 1,             // 57
                         concat2<tag1, tag2, // 55 22    // 56
                    tag1<conblock<160, 1, 1,             // 55
@@ -381,7 +381,7 @@ namespace darknet
                         add_prev1< // 14                // 17
                         conblock<80, 3, 1,              // 16
                         conblock<80, 1, 1,              // 15
-                    tag1<add_prev1< // 11               // 14
+                   tag1<add_prev1< // 11                // 14
                         conblock<80, 3, 1,              // 13
                         conblock<80, 1, 1,              // 12
                    tag1<add_prev1< // 8                 // 11
