@@ -32,9 +32,6 @@ namespace darknet
     template <typename SUBNET> using ytag8 = add_tag_layer<4008, SUBNET>;
     template <typename SUBNET> using ytag16 = add_tag_layer<4016, SUBNET>;
     template <typename SUBNET> using ytag32 = add_tag_layer<4032, SUBNET>;
-    template <typename SUBNET> using yskip8 = add_skip_layer<ytag8, SUBNET>;
-    template <typename SUBNET> using yskip32 = add_skip_layer<ytag32, SUBNET>;
-    template <typename SUBNET> using yskip32 = add_skip_layer<ytag32, SUBNET>;
 
     template <template <typename> class ACT, template <typename> class BN>
     struct def
@@ -113,21 +110,21 @@ namespace darknet
                     SUBNET>>>>>>>>>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
-        using yolo = YTAG<con<3*(classes + 5), 1, 1, 1, 1,
+        using yolo = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
                      conblock<nf, 3, 1,
                 NTAG<conblock5<nf / 2,
                      SUBNET>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
-        using yolo_sam = YTAG<con<3*(classes + 5), 1, 1, 1, 1,
+        using yolo_sam = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
                          conblock<nf, 3, 1,
-                    NTAG<conblock<nf/2, 1, 1,
+                    NTAG<conblock<nf / 2, 1, 1,
                          mult_prev1<
                          sig<bn_con<con<nf, 1, 1, 1, 1,
                     tag1<conblock<nf, 3, 1,
-                         conblock<nf/2, 1, 1,
+                         conblock<nf / 2, 1, 1,
                          conblock<nf,   3, 1,
-                         conblock<nf/2, 1, 1,
+                         conblock<nf / 2, 1, 1,
                          SUBNET>>>>>>>>>>>>>>;
 
         template <int classes>
