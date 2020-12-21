@@ -215,7 +215,7 @@ namespace darknet
                         skip1<	// 182                  // 186
                         ytag16<				// 185
                         sig<con<255, 1, 1, 1, 1,        // 184
-                        conblock<320, 3, 1,		// 183
+                        conblock<640, 3, 1,		// 183
                    tag1<conblock<320, 1, 1,		// 182
                         concat2<tag1, tag2, // 180 173  // 181
                    tag1<conblock<320, 3, 1,		// 180
