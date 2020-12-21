@@ -97,18 +97,26 @@ float iou(const detection& a, const detection& b, iout_t type)
     return ret;
 }
 
-float sigmoid(const float x)
+constexpr float sigmoid(const float x)
 {
     return 1.0f / (1.0f + std::exp(-x));
 }
 
+constexpr float linear(const float x)
+{
+    return x;
+}
+
+
+template<typename activation>
 void add_detections(
     const dlib::tensor& t,
     const std::vector<std::pair<float, float>>& anchors,
     const std::vector<std::string>& labels,
     const int stride,
     const float conf_thresh,
-    std::vector<detection>& detections)
+    std::vector<detection>& detections,
+    activation act = sigmoid)
 {
     const size_t nattr = t.k() / anchors.size();
     const size_t nclasses = nattr - 5;
@@ -120,17 +128,32 @@ void add_detections(
             for (long x = 0; x < t.nc(); ++x)
             {
                 detection d;
-                d.x = ((out[dlib::tensor_index(t, 0, a * nattr + 0, y, x)]) + x) / t.nc();
-                d.y = ((out[dlib::tensor_index(t, 0, a * nattr + 1, y, x)]) + y) / t.nr();
-                d.w = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)]) * anchors[a].first / (t.nc() * stride);
-                d.h = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)]) * anchors[a].second / (t.nr() * stride);
-                d.obj = out[dlib::tensor_index(t, 0, a * nattr + 4, y, x)];
+                d.x = act((out[dlib::tensor_index(t, 0, a * nattr + 0, y, x)]) + x) / t.nc();
+                d.y = act((out[dlib::tensor_index(t, 0, a * nattr + 1, y, x)]) + y) / t.nr();
+                if (act == linear)
+                {
+                    d.w = out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)] *
+                          out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)] * 4 *
+                          anchors[a].first / (t.nc() * stride);
+                    d.h = out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)] *
+                          out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)] * 4 *
+                          anchors[a].second / (t.nr() * stride);
+                }
+                else
+                {
+                    d.w = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 2, y, x)]) *
+                          anchors[a].first / (t.nc() * stride);
+                    d.h = std::exp(out[dlib::tensor_index(t, 0, a * nattr + 3, y, x)]) *
+                          anchors[a].second / (t.nr() * stride);
+                }
+
+                d.obj = act(out[dlib::tensor_index(t, 0, a * nattr + 4, y, x)]);
 
                 if (d.obj > conf_thresh)
                 {
                     for (size_t p = 0; p < nclasses; ++p)
                     {
-                        const float temp = out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)];
+                        const float temp = act(out[dlib::tensor_index(t, 0, a * nattr + 5 + p, y, x)]);
                         if (temp > d.score)
                         {
                             d.score = temp;
