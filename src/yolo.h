@@ -128,7 +128,6 @@ void add_detections(
             for (long x = 0; x < t.nc(); ++x)
             {
                 const float obj = sigmoid(out[dlib::tensor_index(t, 0, a * nattr + 4, y, x)]); 
-
                 if (obj > conf_thresh)
                 {
                     detection d;
