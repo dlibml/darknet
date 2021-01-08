@@ -8,7 +8,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-auto get_random_color(const std::string& label) -> dlib::rgb_pixel
+inline auto get_random_color(const std::string& label) -> dlib::rgb_pixel
 {
     int seed = 0;
     for (size_t i = 0; i < label.size(); ++i)
@@ -23,7 +23,7 @@ auto get_random_color(const std::string& label) -> dlib::rgb_pixel
     return rgb;
 }
 
-auto get_color_map(const std::vector<std::string>& labels) -> std::map<std::string, dlib::rgb_pixel>
+inline auto get_color_map(const std::vector<std::string>& labels) -> std::map<std::string, dlib::rgb_pixel>
 {
     std::map<std::string, dlib::rgb_pixel> label_to_color;
     for (const auto& label : labels)
@@ -33,7 +33,7 @@ auto get_color_map(const std::vector<std::string>& labels) -> std::map<std::stri
     return label_to_color;
 }
 
-void render_bounding_boxes(
+inline void render_bounding_boxes(
     dlib::matrix<dlib::rgb_pixel>& img,
     const std::vector<detection>& detections,
     const std::map<std::string, dlib::rgb_pixel>& label_to_color,
