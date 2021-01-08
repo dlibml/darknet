@@ -423,7 +423,7 @@ namespace darknet
 
     // clang-format on
 
-    template <typename net_type>
+    template <typename net_type, unsigned int offset = 1>
     void setup_detector(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
         // remove bias
@@ -435,9 +435,9 @@ namespace darknet
         // setup leaky relus
         visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
         // set the number of filters
-        layer<ytag8, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag16, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag32, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag8, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag16, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag32, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         // allocate the network
         matrix<rgb_pixel> image(img_size, img_size);
         net(image);
