@@ -429,9 +429,7 @@ namespace darknet
         // remove bias
         disable_duplicative_biases(net);
         // remove mean from input image
-        visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
-            l = input_rgb_image(0, 0, 0);
-        });
+        layer<net_type::num_layers - 1>(net) = input_rgb_image(0, 0, 0);
         // setup leaky relus
         visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
         // set the number of filters
@@ -447,11 +445,9 @@ namespace darknet
     void setup_classifier(net_type& net, int num_classes = 1000, size_t img_size = 416)
     {
         // remove bias
-        disable_duplicative_bias(net);
+        disable_duplicative_biases(net);
         // remove mean from input image
-        visit_layers_backwards(net, [](size_t, input_rgb_image& l) {
-            l = input_rgb_image(0, 0, 0);
-        });
+        layer<net_type::num_layers - 1>(net) = input_rgb_image(0, 0, 0);
         // setup leaky relus
         visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
         // set the number of filters
