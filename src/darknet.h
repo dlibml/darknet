@@ -73,6 +73,10 @@ namespace darknet
                                                  INPUT>>>>>>>>>>>>>;
 
        template <typename SUBNET> using resv4_64= resv4<64, SUBNET>;
+       template <typename SUBNET> using resv4_80= resv4<80, SUBNET>;
+       template <typename SUBNET> using resv4_160= resv4<160, SUBNET>;
+       template <typename SUBNET> using resv4_320= resv4<320, SUBNET>;
+       template <typename SUBNET> using resv4_640= resv4<640, SUBNET>;
        template <typename SUBNET> using resv4_128 = resv4<128, SUBNET>;
        template <typename SUBNET> using resv4_256 = resv4<256, SUBNET>;
        template <typename SUBNET> using resv4_512 = resv4<512, SUBNET>;
@@ -104,10 +108,7 @@ namespace darknet
                tag3<max_pool<9, 9, 1, 1,            // 110
                     skip1<                          // 109
                tag2<max_pool<5, 5, 1, 1,            // 108
-               tag1<conblock<512, 1, 1,             // 107
-                    conblock<1024, 3, 1,            // 106
-                    conblock<512, 1, 1,             // 105
-                    SUBNET>>>>>>>>>>>>>;
+               tag1<SUBNET>>>>>>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
         using yolo = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
@@ -164,7 +165,11 @@ namespace darknet
                 ntag32<conblock<512, 1, 1,                  // 116
                        conblock<1024, 3, 1,                 // 115
                        conblock<512, 1, 1,                  // 114
-                       spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                       spp<
+                       conblock<512, 1, 1,                  // 107
+                       conblock<1024, 3, 1,                 // 106
+                       conblock<512, 1, 1,                  // 105
+                       SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <int classes, typename SUBNET>
         using yolov4_sam = yolo_sam<1024, classes, ytag32, ntag32,  // 161
@@ -190,7 +195,11 @@ namespace darknet
                     ntag32<conblock<512, 1, 1,                      // 116
                            conblock<1024, 3, 1,                     // 115
                            conblock<512, 1, 1,                      // 114
-                           spp<SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                           spp<
+                           conblock<512, 1, 1,                      // 107
+                           conblock<1024, 3, 1,                     // 106
+                           conblock<512, 1, 1,                      // 105
+                           SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <typename INPUT>
         using yolov4x = ytag32<                         // 202
@@ -268,143 +277,24 @@ namespace darknet
                         conblock<640, 1, 1,             // 130
                         conblock<640, 3, 1,             // 129
                         conblock<640, 1, 1,             // 128
-                        concat4<tag4, tag3, tag2, tag1, // 127
-                   tag4<max_pool<13, 13, 1, 1,          // 126
-                        skip1< // 121                   // 125
-                   tag3<max_pool<9, 9, 1, 1,            // 124
-                        skip1< // 121                   // 123
-                   tag2<max_pool<5, 5, 1, 1,            // 122
-                   tag1<conblock<640, 1, 1,             // 121
+                        spp<
+                        conblock<640, 1, 1,             // 121
                         conblock<640, 3, 1,             // 120
                         conblock<640, 1, 1,             // 119
                         skip1< // 116                   // 118
                    tag5<conblock<640, 1, 1,             // 117
-                   tag1<conblock<1280, 1, 1,            // 116
-                        concat2<tag1, tag2, // 114 96   // 115
-                   tag1<conblock<640, 1, 1,             // 114
-                        add_prev1< // 110               // 113
-                        conblock<640, 3, 1,             // 112
-                        conblock<640, 1, 1,             // 111
-                   tag1<add_prev1< // 107               // 110
-                        conblock<640, 3, 1,             // 109
-                        conblock<640, 1, 1,             // 108
-                   tag1<add_prev1< // 104               // 107
-                        conblock<640, 3, 1,             // 106
-                        conblock<640, 1, 1,             // 105
-                   tag1<add_prev1< // 101               // 104
-                        conblock<640, 3, 1,             // 10k
-                        conblock<640, 1, 1,             // 102
-                   tag1<add_prev1< // 98                // 101
-                        conblock<640, 3, 1,             // 100
-                        conblock<640, 1, 1,             // 99
-                   tag1<conblock<640, 1, 1,             // 98
-                        skip1< // 95                    // 97
-                   tag2<conblock<640, 1, 1,             // 96
-                   tag1<conblock<1280, 3, 2,            // 95
-                   tag6<conblock<640, 1, 1,             // 94
-                        concat2<tag1, tag2, // 92 59    // 93
-                   tag1<conblock<320, 1, 1,             // 92
-                        add_prev1< // 88                // 91
-                        conblock<320, 3, 1,             // 90
-                        conblock<320, 1, 1,             // 89
-                   tag1<add_prev1< // 85                // 88
-                        conblock<320, 3, 1,             // 87
-                        conblock<320, 1, 1,             // 86
-                   tag1<add_prev1< // 82                // 85
-                        conblock<320, 3, 1,             // 84
-                        conblock<320, 1, 1,             // 83
-                   tag1<add_prev1< // 79                // 82
-                        conblock<320, 3, 1,             // 81
-                        conblock<320, 1, 1,             // 80
-                   tag1<add_prev1< // 76                // 79
-                        conblock<320, 3, 1,             // 78
-                        conblock<320, 1, 1,             // 77
-                   tag1<add_prev1< // 73                // 76
-                        conblock<320, 3, 1,             // 75
-                        conblock<320, 1, 1,             // 73
-                   tag1<add_prev1< // 70                // 73
-                        conblock<320, 3, 1,             // 72
-                        conblock<320, 1, 1,             // 71
-                   tag1<add_prev1< // 67                // 70
-                        conblock<320, 3, 1,             // 69
-                        conblock<320, 1, 1,             // 68
-                   tag1<add_prev1< // 64                // 67
-                        conblock<320, 3, 1,             // 66
-                        conblock<320, 1, 1,             // 65
-                   tag1<add_prev1< // 61                // 64
-                        conblock<320, 3, 1,             // 63
-                        conblock<320, 1, 1,             // 62
-                   tag1<conblock<320, 1, 1,             // 61
-                        skip1< // 58                    // 60
-                   tag2<conblock<320, 1, 1,             // 59
-                   tag1<conblock<640, 3, 2,             // 58
-                   tag7<conblock<320, 1, 1,             // 57
-                        concat2<tag1, tag2, // 55 22    // 56
-                   tag1<conblock<160, 1, 1,             // 55
-                        add_prev1< // 51                // 54
-                        conblock<160, 3, 1,             // 53
-                        conblock<160, 1, 1,             // 52
-                   tag1<add_prev1< // 48                // 51
-                        conblock<160, 3, 1,             // 50
-                        conblock<160, 1, 1,             // 49
-                   tag1<add_prev1< // 45                // 48
-                        conblock<160, 3, 1,             // 47
-                        conblock<160, 1, 1,             // 46
-                   tag1<add_prev1< // 42                // 45
-                        conblock<160, 3, 1,             // 44
-                        conblock<160, 1, 1,             // 43
-                   tag1<add_prev1< // 39                // 42
-                        conblock<160, 3, 1,             // 41
-                        conblock<160, 1, 1,             // 40
-                   tag1<add_prev1< // 36                // 39
-                        conblock<160, 3, 1,             // 38
-                        conblock<160, 1, 1,             // 37
-                   tag1<add_prev1< // 33                // 36
-                        conblock<160, 3, 1,             // 35
-                        conblock<160, 1, 1,             // 34
-                   tag1<add_prev1< // 30                // 33
-                        conblock<160, 3, 1,             // 32
-                        conblock<160, 1, 1,             // 31
-                   tag1<add_prev1< // 27                // 30
-                        conblock<160, 3, 1,             // 29
-                        conblock<160, 1, 1,             // 28
-                   tag1<add_prev1< // 24                // 27
-                        conblock<160, 3, 1,             // 26
-                        conblock<160, 1, 1,             // 25
-                   tag1<conblock<160, 1, 1,             // 24
-                        skip1< // 21                    // 23
-                   tag2<conblock<160, 1, 1,             // 22
-                   tag1<conblock<320, 3, 2,             // 21
-                        conblock<160, 1, 1,             // 20
-                        concat2<tag1, tag2, // 18 6     // 19
-                   tag1<conblock<80, 1, 1,              // 18
-                        add_prev1< // 14                // 17
-                        conblock<80, 3, 1,              // 16
-                        conblock<80, 1, 1,              // 15
-                   tag1<add_prev1< // 11                // 14
-                        conblock<80, 3, 1,              // 13
-                        conblock<80, 1, 1,              // 12
-                   tag1<add_prev1< // 8                 // 11
-                        conblock<80, 3, 1,              // 10
-                        conblock<80, 1, 1,              // 9
-                   tag1<conblock<80, 1, 1,              // 8
-                        skip1< // 5                     // 7
-                   tag2<conblock<80, 1, 1,              // 6
-                   tag1<conblock<160, 3, 2,             // 5
-                        add_prev1< // 1                 // 4
-                        conblock<80, 3, 1,              // 3
-                        conblock<40, 1, 1,              // 2
-                   tag1<conblock<80, 3, 2,              // 1
+                   tag1<cspblock<640, 2, 5, resv4_640,
+                   tag6<cspblock<320, 2, 10, resv4_320,
+                   tag7<cspblock<160, 2, 10, resv4_160,
+                        cspblock<80, 2, 3, resv4_80,
+                        resv3<80,
+                        conblock<80, 3, 2,              // 1
                         conblock<32, 3, 1,              // 0
                         INPUT>
                         >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                         >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                         >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>;
+                        >>>;
 
 
     };
