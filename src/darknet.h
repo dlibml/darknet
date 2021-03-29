@@ -45,12 +45,35 @@ namespace darknet
                          conblock<nf2, 1, 1,
                     tag1<SUBNET>>>>;
 
-        template <long nf, typename SUBNET>
-        using conblock5 = conblock<nf, 1, 1,
-                          conblock<nf * 2, 3, 1,
+        template <long nf, long factor, typename SUBNET>
+        using conblock2 = conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1, SUBNET>>;
+
+        template <long nf, long factor, typename SUBNET>
+        using conblock3 = conblock<nf, 1, 1,
+                          conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1, SUBNET>>>;
+
+        template <long nf, long factor, typename SUBNET>
+        using conblock4 = conblock<nf * factor, 3, 1,
                           conblock<nf, 1, 1,
-                          conblock<nf * 2, 3, 1,
+                          conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1, SUBNET>>>>;
+
+        template <long nf, long factor, typename SUBNET>
+        using conblock5 = conblock<nf, 1, 1,
+                          conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1,
+                          conblock<nf * factor, 3, 1,
                           conblock<nf, 1, 1, SUBNET>>>>>;
+
+        template <long nf, long factor, typename SUBNET>
+        using conblock6 = conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1,
+                          conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1,
+                          conblock<nf * factor, 3, 1,
+                          conblock<nf, 1, 1, SUBNET>>>>>>;
 
         // the residual block introduced in YOLOv3 (with bottleneck)
         template <long nf, typename SUBNET> using resv3 = residual<nf, nf / 2, SUBNET>;
@@ -113,7 +136,7 @@ namespace darknet
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
         using yolo = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
                      conblock<nf, 3, 1,
-                NTAG<conblock5<nf / 2,
+                NTAG<conblock5<nf / 2, 2,
                      SUBNET>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
@@ -122,11 +145,8 @@ namespace darknet
                     NTAG<conblock<nf / 2, 1, 1,
                          mult_prev1<
                          sig<bn_con<con<nf, 1, 1, 1, 1,
-                    tag1<conblock<nf, 3, 1,
-                         conblock<nf / 2, 1, 1,
-                         conblock<nf,   3, 1,
-                         conblock<nf / 2, 1, 1,
-                         SUBNET>>>>>>>>>>>>>>;
+                    tag1<conblock4<nf * 2, 2,
+                         SUBNET>>>>>>>>>>>;
 
         template <int classes>
         using yolov3 = yolo<256, classes, ytag8, ntag8,
@@ -156,20 +176,16 @@ namespace darknet
                        bskip8<                              // 129
                   tag2<upsample<2,                          // 128
                        conblock<128, 1, 1,                  // 127
-                ntag16<conblock5<256,                       // 126
+                ntag16<conblock5<256, 2,                    // 126
                        concat2<tag1, tag2,                  // 121
                   tag1<conblock<256, 1, 1,                  // 120
                        bskip16<                             // 119
                   tag2<upsample<2,                          // 118
                        conblock<256, 1, 1,                  // 117
-                ntag32<conblock<512, 1, 1,                  // 116
-                       conblock<1024, 3, 1,                 // 115
-                       conblock<512, 1, 1,                  // 114
+                ntag32<conblock3<512, 2,
                        spp<
-                       conblock<512, 1, 1,                  // 107
-                       conblock<1024, 3, 1,                 // 106
-                       conblock<512, 1, 1,                  // 105
-                       SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                       conblock3<512, 2,                    // 107
+                       SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <int classes, typename SUBNET>
         using yolov4_sam = yolo_sam<1024, classes, ytag32, ntag32,  // 161
@@ -186,33 +202,23 @@ namespace darknet
                            bskip8<                                  // 129
                       tag2<upsample<2,                              // 128
                            conblock<128, 1, 1,                      // 127
-                    ntag16<conblock5<256,                           // 126
+                    ntag16<conblock5<256, 2,                        // 126
                            concat2<tag1, tag2,                      // 121
                       tag1<conblock<256, 1, 1,                      // 120
                            bskip16<                                 // 119
                       tag2<upsample<2,                              // 118
                            conblock<256, 1, 1,                      // 117
-                    ntag32<conblock<512, 1, 1,                      // 116
-                           conblock<1024, 3, 1,                     // 115
-                           conblock<512, 1, 1,                      // 114
+                    ntag32<conblock3<512, 2,
                            spp<
-                           conblock<512, 1, 1,                      // 107
-                           conblock<1024, 3, 1,                     // 106
-                           conblock<512, 1, 1,                      // 105
-                           SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
+                           conblock3<512, 2,                        // 107
+                           SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <typename INPUT>
         using yolov4x = ytag32<                         // 202
                         sig<con<255, 1, 1, 1, 1,        // 201
-                        conblock<1280, 3, 1,            // 200
-                        conblock<640, 1, 1,             // 199
+                        conblock2<640, 2,               // 200
                         concat2<tag1, tag2, // 197 190  // 198
-                   tag1<conblock<640, 3, 1,             // 197
-                        conblock<640, 1, 1,             // 196
-                        conblock<640, 3, 1,             // 195
-                        conblock<640, 1, 1,             // 194
-                        conblock<640, 3, 1,             // 193
-                        conblock<640, 1, 1,             // 192
+                   tag1<conblock6<640, 1,               // 197
                         skip1< // 189                   // 191
                    tag2<conblock<640, 1, 1,             // 190
                    tag1<conblock<640, 1, 1,             // 189
@@ -224,12 +230,7 @@ namespace darknet
                         conblock<640, 3, 1,             // 183
                    tag1<conblock<320, 1, 1,             // 182
                         concat2<tag1, tag2, // 180 173  // 181
-                   tag1<conblock<320, 3, 1,             // 180
-                        conblock<320, 1, 1,             // 179
-                        conblock<320, 3, 1,             // 178
-                        conblock<320, 1, 1,             // 177
-                        conblock<320, 3, 1,             // 176
-                        conblock<320, 1, 1,             // 175
+                   tag1<conblock6<320, 1,               // 180
                         skip1< // 172                   // 174
                    tag2<conblock<320, 1, 1,             // 173
                    tag1<conblock<320, 1, 1,             // 172
@@ -241,12 +242,7 @@ namespace darknet
                         conblock<320, 3, 1,             // 166
                    tag1<conblock<160, 1, 1,             // 165
                         concat2<tag1, tag2, // 163 156  // 164
-                   tag1<conblock<160, 3, 1,             // 163
-                        conblock<160, 1, 1,             // 162
-                        conblock<160, 3, 1,             // 161
-                        conblock<160, 1, 1,             // 160
-                        conblock<160, 3, 1,             // 159
-                        conblock<160, 1, 1,             // 158
+                   tag1<conblock6<160, 1,               // 163
                         skip1< // 155                   // 157
                    tag2<conblock<160, 1, 1,             // 156
                    tag1<conblock<160, 1, 1,             // 155
@@ -257,12 +253,7 @@ namespace darknet
                         conblock<160, 1, 1,             // 150
                    tag8<conblock<320, 1, 1,             // 149
                         concat2<tag1, tag2, // 147 140  // 148
-                   tag1<conblock<320, 3, 1,             // 147
-                        conblock<320, 1, 1,             // 146
-                        conblock<320, 3, 1,             // 145
-                        conblock<320, 1, 1,             // 144
-                        conblock<320, 3, 1,             // 143
-                        conblock<320, 1, 1,             // 142
+                   tag1<conblock6<320, 1,               // 147
                         skip1< // 139                   // 141
                    tag2<conblock<320, 1, 1,             // 140
                    tag1<conblock<320, 1, 1,             // 139
@@ -273,14 +264,9 @@ namespace darknet
                         conblock<320, 1, 1,             // 134
                    tag9<conblock<640, 1, 1,             // 133
                         concat2<tag1, tag5, // 131 117  // 132
-                   tag1<conblock<640, 3, 1,             // 131
-                        conblock<640, 1, 1,             // 130
-                        conblock<640, 3, 1,             // 129
-                        conblock<640, 1, 1,             // 128
+                   tag1<conblock4<640, 1,               // 131
                         spp<
-                        conblock<640, 1, 1,             // 121
-                        conblock<640, 3, 1,             // 120
-                        conblock<640, 1, 1,             // 119
+                        conblock3<640, 1,               // 121
                         skip1< // 116                   // 118
                    tag5<conblock<640, 1, 1,             // 117
                    tag1<cspblock<640, 2, 5, resv4_640,
@@ -293,8 +279,7 @@ namespace darknet
                         INPUT>
                         >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
                         >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-                        >>>;
+                        >>>>>>>>>>>>>>>;
 
 
     };
