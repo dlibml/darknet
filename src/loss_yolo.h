@@ -5,32 +5,6 @@
 
 namespace dlib
 {
-
-    namespace impl
-    {
-        template <template <typename> class TAG_TYPE, template <typename> class... TAG_TYPES>
-        struct yolo_helper_impl
-        {
-            constexpr static size_t tag_count()
-            {
-                return 1 + yolo_helper_impl<TAG_TYPES...>::tag_count();
-            }
-
-            static void list_tags(std::ostream& out)
-            {
-                out << tag_id<TAG_TYPE>::id << (tag_count() > 1 ? "," : "");
-                yolo_helper_impl<TAG_TYPES...>::list_tags(out);
-            }
-        };
-
-        template <template <typename> class TAG_TYPE>
-        struct yolo_helper_impl<TAG_TYPE>
-        {
-            constexpr static size_t tag_count() { return 1; }
-            static void list_tags(std::ostream& out) { out << tag_id<TAG_TYPE>::id; }
-        };
-    }  // namespace impl
-
     using yolo_rect = mmod_rect;
     inline bool operator<(const yolo_rect& lhs, const yolo_rect& rhs)
     {
@@ -105,7 +79,93 @@ namespace dlib
         test_box_overlap overlaps_ignore;
     };
 
-    template <template <typename> class TAG_8, template <typename> class TAG_16, template <typename> class TAG_32>
+    namespace impl
+    {
+        template <template <typename> class TAG_TYPE, template <typename> class... TAG_TYPES>
+        struct yolo_helper_impl
+        {
+            constexpr static size_t tag_count()
+            {
+                return 1 + yolo_helper_impl<TAG_TYPES...>::tag_count();
+            }
+
+            static void list_tags(std::ostream& out)
+            {
+                out << tag_id<TAG_TYPE>::id << (tag_count() > 1 ? "," : "");
+                yolo_helper_impl<TAG_TYPES...>::list_tags(out);
+            }
+
+            template <typename net_type>
+            static void tensor_to_dets(
+                const net_type& net,
+                const tensor& input,
+                const long i,
+                const yolo_options& options,
+                std::vector<yolo_rect>& dets
+            )
+            {
+                yolo_helper_impl<TAG_TYPE>::tensor_to_dets(net, input, i, options, dets);
+                yolo_helper_impl<TAG_TYPES...>::tensor_to_dets(net, input, i, options, dets);
+            }
+        };
+
+        template <template <typename> class TAG_TYPE>
+        struct yolo_helper_impl<TAG_TYPE>
+        {
+            constexpr static size_t tag_count() { return 1; }
+
+            static void list_tags(std::ostream& out) { out << tag_id<TAG_TYPE>::id; }
+
+            template <typename net_type>
+            static void tensor_to_dets(
+                const net_type& net,
+                const tensor& input,
+                const long i,
+                const yolo_options& options,
+                std::vector<yolo_rect>& dets
+            )
+            {
+                DLIB_CASSERT(net.sample_expansion_factor() == 1, net.sample_expansion_factor());
+                const tensor& t = layer<TAG_TYPE>(net).get_output();
+                const size_t stride = input.nr() / t.nr();
+                const auto& anchors = options.anchors.at(stride);
+                const size_t num_attribs = t.k() / anchors.size();
+                const size_t num_classes = num_attribs - 5;
+                const float* const out = t.host();
+                for (size_t a = 0; a < anchors.size(); ++a)
+                {
+                    for (long r = 0; r < t.nr(); ++r)
+                    {
+                        for (long c = 0; c < t.nc(); ++c)
+                        {
+                            const float obj = sigmoid(out[tensor_index(t, i, a * num_attribs + 4, r, c)]);
+                            if (obj > options.conf_thresh)
+                            {
+                                const float x = (sigmoid(out[tensor_index(t, i, a * num_attribs + 0, r, c)]) + c) * stride;
+                                const float y = (sigmoid(out[tensor_index(t, i, a * num_attribs + 1, r, c)]) + r) * stride;
+                                const float w = std::exp(out[tensor_index(t, i, a * num_attribs + 2, r, c)]) * anchors[a].width;
+                                const float h = std::exp(out[tensor_index(t, i, a * num_attribs + 3, r, c)]) * anchors[a].height;
+                                yolo_rect d(centered_drect(dpoint(x, y), w, h), 0);
+                                for (size_t k = 0; k < num_classes; ++k)
+                                {
+                                    const float p = (sigmoid(out[tensor_index(t, i, a * num_attribs + 5 + k, r, c)]));
+                                    if (p > d.detection_confidence)
+                                    {
+                                        d.detection_confidence = p;
+                                        d.label = options.labels[k];
+                                    }
+                                }
+                                d.detection_confidence *= obj;
+                                dets.push_back(std::move(d));
+                            }
+                        }
+                    }
+                }
+            }
+        };
+    }  // namespace impl
+
+    template <template <typename> class... TAG_TYPES>
     class loss_yolo_
     {
     public:
@@ -115,7 +175,11 @@ namespace dlib
 
         loss_yolo_() {};
 
-        loss_yolo_(const yolo_options& options) : options(options) { }
+        loss_yolo_(const yolo_options& options) : options(options) {
+            impl::yolo_helper_impl<TAG_TYPES...> test;
+            test.list_tags(std::cout);
+            std::cout << std::endl << test.tag_count() << std::endl;
+        }
 
         template <
             typename SUB_TYPE,
@@ -124,21 +188,16 @@ namespace dlib
         void to_label (
             const tensor& input_tensor,
             const SUB_TYPE& sub,
-            label_iterator iter,
-            double adjust_threhsold = 0.25
+            label_iterator iter
         ) const
         {
-            const tensor& output_tensor = sub.get_output();
-            DLIB_CASSERT(input_tensor.num_samples() == output_tensor.num_samples());
             DLIB_CASSERT(sub.sample_expansion_factor() == 1, sub.sample_expansion_factor());
             std::vector<yolo_rect> dets_accum;
             output_label_type final_dets;
-            for (long i = 0; i < output_tensor.num_samples(); ++i)
+            for (long i = 0; i < input_tensor.num_samples(); ++i)
             {
                 dets_accum.clear();
-                tensor_to_dets(input_tensor, layer<TAG_8>(sub).get_output(), i, dets_accum, adjust_threhsold, sub);
-                tensor_to_dets(input_tensor, layer<TAG_16>(sub).get_output(), i, dets_accum, adjust_threhsold, sub);
-                tensor_to_dets(input_tensor, layer<TAG_32>(sub).get_output(), i, dets_accum, adjust_threhsold, sub);
+                impl::yolo_helper_impl<TAG_TYPES...>::tensor_to_dets(sub, input_tensor, i, options, dets_accum);
 
                 // Do non-max suppression
                 std::sort(dets_accum.rbegin(), dets_accum.rend());
@@ -189,53 +248,6 @@ namespace dlib
                     return true;
             }
             return false;
-        }
-
-        template <typename net_type>
-        void tensor_to_dets (
-            const tensor& in,
-            const tensor& t,
-            const long i,
-            std::vector<yolo_rect>& dets_accum,
-            double adjust_threhsold,
-            const net_type& net
-        ) const
-        {
-            DLIB_CASSERT(net.sample_expansion_factor() == 1, net.sample_expansion_factor());
-            const size_t stride = in.nr() / t.nr();
-            const auto& anchors = options.anchors.at(stride);
-            const size_t num_attribs = t.k() / anchors.size();
-            const size_t num_classes = num_attribs - 5;
-            const float* const out = t.host();
-            for (size_t a = 0; a < anchors.size(); ++a)
-            {
-                for (long r = 0; r < t.nr(); ++r)
-                {
-                    for (long c = 0; c < t.nc(); ++c)
-                    {
-                        const float obj = sigmoid(out[tensor_index(t, i, a * num_attribs + 4, r, c)]);
-                        if (obj > adjust_threhsold)
-                        {
-                            const float x = (sigmoid(out[tensor_index(t, i, a * num_attribs + 0, r, c)]) + c) * stride;
-                            const float y = (sigmoid(out[tensor_index(t, i, a * num_attribs + 1, r, c)]) + r) * stride;
-                            const float w = std::exp(out[tensor_index(t, i, a * num_attribs + 2, r, c)]) * anchors[a].width;
-                            const float h = std::exp(out[tensor_index(t, i, a * num_attribs + 3, r, c)]) * anchors[a].height;
-                            yolo_rect d(centered_drect(dpoint(x, y), w, h), 0);
-                            for (size_t k = 0; k < num_classes; ++k)
-                            {
-                                const float p = (sigmoid(out[tensor_index(t, i, a * num_attribs + 5 + k, r, c)]));
-                                if (p > d.detection_confidence)
-                                {
-                                    d.detection_confidence = p;
-                                    d.label = options.labels[k];
-                                }
-                            }
-                            d.detection_confidence *= obj;
-                            dets_accum.push_back(std::move(d));
-                        }
-                    }
-                }
-            }
         }
     };
 
