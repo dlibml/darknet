@@ -3,10 +3,10 @@
 
 #include <dlib/cmd_line_parser.h>
 
-using net_train_type = darknet::yolov4x_mish_train;
-using net_infer_type = darknet::yolov4x_mish_infer;
+using net_train_type = darknet::yolov3_train;
+using net_infer_type = darknet::yolov3_infer;
 // layer offset is 2 for yolov4x_mish yolov4_csp and scaled_yolov4, and 1 for the previous models
-const unsigned int layer_offset = 2;
+const unsigned int layer_offset = 1;
 
 int main(const int argc, const char** argv)
 try

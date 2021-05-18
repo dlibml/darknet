@@ -77,7 +77,7 @@ add_dlib_library(yolov4_sam_mish)
 add_dlib_library(yolov4x_mish)
 
 add_dlib_executable(main)
-target_link_libraries(main PRIVATE yolov4_sam_mish)
+target_link_libraries(main PRIVATE)
 
 add_dlib_executable(convert_weights)
-target_link_libraries(convert_weights PRIVATE yolov4)
+target_link_libraries(convert_weights)

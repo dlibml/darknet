@@ -35,7 +35,7 @@ inline auto get_color_map(const std::vector<std::string>& labels) -> std::map<st
 
 inline void render_bounding_boxes(
     dlib::matrix<dlib::rgb_pixel>& img,
-    const std::vector<detection>& detections,
+    const std::vector<dlib::mmod_rect>& detections,
     const std::map<std::string, dlib::rgb_pixel>& label_to_color,
     const bool draw_labels = true)
 {
@@ -46,12 +46,8 @@ inline void render_bounding_boxes(
     const auto white = cv::Scalar(255, 255, 255);
     for (const auto& d : detections)
     {
-        const double prob = d.score;
-        dlib::rectangle r(
-            round(d.xstart() * img.nc()),
-            round(d.ystart() * img.nr()),
-            round(d.xstop() * img.nc()),
-            round(d.ystop() * img.nr()));
+        const double prob = d.detection_confidence;
+        dlib::rectangle r(d.rect);
         std::ostringstream sout;
         sout << d.label << std::fixed << std::setprecision(0) << " (" << 100 * prob << "%)";
         std::string label = sout.str();

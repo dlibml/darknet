@@ -1,13 +1,30 @@
 #include "darknet.h"
+#include "loss_yolo.h"
 #include "ui_utils.h"
-#include "weights_visitor.h"
-#include "yolov4_sam_mish.h"
 
 #include <dlib/cmd_line_parser.h>
 #include <dlib/dir_nav.h>
 #include <dlib/image_io.h>
 
+using net_type =
+    dlib::loss_yolo<darknet::ytag8, darknet::ytag16, darknet::ytag32, darknet::yolov3_infer>;
+
 const static std::string exts{".jpg .JPG .jpeg .JPEG .png .PNG .gif .GIF"};
+
+using rgb_image = dlib::matrix<dlib::rgb_pixel>;
+
+auto preprocess_image(const rgb_image& image, rgb_image& output, const long image_size)
+{
+    return dlib::rectangle_transform(dlib::inv(dlib::letterbox_image(image, output, image_size)));
+}
+
+auto postprocess_detections(
+    const dlib::rectangle_transform& tform,
+    std::vector<dlib::yolo_rect>& detections)
+{
+    for (auto& d : detections)
+        d.rect = tform(d.rect);
+}
 
 int main(const int argc, const char** argv)
 try
@@ -18,7 +35,7 @@ try
     parser.add_option("output", "path to output video file (.mkv extension) or directory", 1);
     parser.add_option("webcam", "index of webcam to use (default: 0)", 1);
     parser.add_option("names", "path to file with label names (one per line)", 1);
-    parser.add_option("img-size", "image size to process (default: 416)", 1);
+    parser.add_option("size", "image size to process (default: 416)", 1);
     parser.add_option("conf-thresh", "confidence threshold (default: 0.25)", 1);
     parser.add_option("nms-thresh", "non-max suppression threshold (default: 0.45)", 1);
     parser.add_option("fps", "force frames per second (default: 30)", 1);
@@ -44,7 +61,7 @@ try
     const std::string names_path = dlib::get_option(parser, "names", "");
     const int webcam_idx = dlib::get_option(parser, "webcam", 0);
     float fps = dlib::get_option(parser, "fps", 30);
-    const long img_size = dlib::get_option(parser, "img-size", 416);
+    const long image_size = dlib::get_option(parser, "size", 416);
     const float conf_thresh = dlib::get_option(parser, "conf-thresh", 0.25);
     const float nms_thresh = dlib::get_option(parser, "nms-thresh", 0.45);
     const std::string dnn_path = dlib::get_option(parser, "dnn", "");
@@ -65,9 +82,18 @@ try
     }
     std::cout << "found " << labels.size() << " classes\n";
 
-    yolov4_sam_mish yolo(dnn_path, names_path);
     const auto label_to_color = get_color_map(labels);
     webcam_window win;
+
+    dlib::yolo_options options;
+    options.anchors = {
+        {8, {{10, 13}, {16, 30}, {33, 23}}},
+        {16, {{30, 61}, {62, 45}, {59, 119}}},
+        {32, {{116, 90}, {156, 198}, {373, 326}}}};
+    options.labels = labels;
+    options.overlaps_nms = dlib::test_box_overlap(nms_thresh);
+    net_type net(options);
+    dlib::deserialize(dnn_path) >> net.subnet();
 
     if (parser.option("images"))
     {
@@ -77,11 +103,12 @@ try
         for (const auto& file :
              dlib::get_files_in_directory_tree(images_dir, dlib::match_endings(exts)))
         {
-            dlib::matrix<dlib::rgb_pixel> image;
+            dlib::matrix<dlib::rgb_pixel> image, letterbox(image_size, image_size);
             dlib::load_image(image, file.full_name());
-            std::vector<detection> detections;
-            yolo.detect(image, detections, img_size, conf_thresh, nms_thresh);
-            render_bounding_boxes(image, detections, label_to_color);
+            const auto tform = preprocess_image(image, letterbox, image_size);
+            auto detections = net(letterbox);
+            postprocess_detections(tform, detections);
+            render_bounding_boxes(image, detections, label_to_color, true);
             const std::string out_name = file.name().substr(0, file.name().rfind(".")) + ".png";
             dlib::save_png(image, output_dir + "/" + out_name);
             std::cerr << file.name() << ": " << detections.size() << " detections\n";
@@ -132,9 +159,9 @@ try
 
     dlib::running_stats_decayed<float> rs(10);
     std::cout << std::fixed << std::setprecision(2);
+    dlib::matrix<dlib::rgb_pixel> image, letterbox(image_size, image_size);
     while (not win.is_closed())
     {
-        dlib::matrix<dlib::rgb_pixel> image;
         cv::Mat cv_cap;
         if (!vid_src.read(cv_cap))
         {
@@ -148,14 +175,17 @@ try
             dlib::assign_image(image, tmp);
         win.clear_overlay();
         const auto t0 = std::chrono::steady_clock::now();
-        std::vector<detection> detections;
-        yolo.detect(image, detections, img_size, win.conf_thresh, nms_thresh);
+        const auto tform = preprocess_image(image, letterbox, image_size);
+        auto detections = net(letterbox);
         const auto t1 = std::chrono::steady_clock::now();
         rs.add(std::chrono::duration_cast<std::chrono::duration<float>>(t1 - t0).count());
-        std::cout << "avg fps: " << 1.0f / rs.mean() << '\r' << std::flush;
+        std::cout << "avg fps: " << 1.0f / rs.mean()
+                  << ", #dets: " << dlib::pad(std::to_string(detections.size()), 3) << '\r'
+                  << std::flush;
+        postprocess_detections(tform, detections);
         if (out_width > 0)
             dlib::resize_image(static_cast<double>(out_width) / image.nc(), image);
-        render_bounding_boxes(image, detections, label_to_color);
+        render_bounding_boxes(image, detections, label_to_color, true);
         win.set_image(image);
         if (not out_path.empty())
         {
