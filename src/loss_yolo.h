@@ -77,7 +77,36 @@ namespace dlib
         double conf_thresh = 0.25;
         test_box_overlap overlaps_nms = test_box_overlap(0.45);
         test_box_overlap overlaps_ignore;
+
     };
+
+    inline void serialize(const yolo_options& item, std::ostream& out)
+    {
+        int version = 1;
+        serialize(version, out);
+        serialize(item.anchors, out);
+        serialize(item.conf_thresh, out);
+        serialize(item.overlaps_nms, out);
+        serialize(item.overlaps_ignore, out);
+    }
+
+    inline void deserialize(yolo_options& item, std::istream& in)
+    {
+        int version = 0;
+        deserialize(version, in);
+        if (version != 1)
+            throw serialization_error("Unexpected version found while deserializing dlib::yolo_options.");
+        deserialize(item.anchors, in);
+        deserialize(item.conf_thresh, in);
+        deserialize(item.overlaps_nms, in);
+        deserialize(item.overlaps_ignore, in);
+    }
+
+    inline std::ostream& operator<<(std::ostream& out, const std::unordered_map<int, std::vector<yolo_options::anchor_box_details>>& anchors)
+    {
+        out << "anchors: " << anchors.size();
+        return out;
+    }
 
     namespace impl
     {
@@ -168,18 +197,18 @@ namespace dlib
     template <template <typename> class... TAG_TYPES>
     class loss_yolo_
     {
+        static void list_tags(std::ostream& out) { impl::yolo_helper_impl<TAG_TYPES...>::list_tags(out); }
+
     public:
 
         typedef std::vector<yolo_rect> training_label_type;
         typedef std::vector<yolo_rect> output_label_type;
 
+        constexpr static size_t tag_count() { return impl::yolo_helper_impl<TAG_TYPES...>::tag_count(); }
+
         loss_yolo_() {};
 
-        loss_yolo_(const yolo_options& options) : options(options) {
-            impl::yolo_helper_impl<TAG_TYPES...> test;
-            test.list_tags(std::cout);
-            std::cout << std::endl << test.tag_count() << std::endl;
-        }
+        loss_yolo_(const yolo_options& options) : options(options) { }
 
         template <
             typename SUB_TYPE,
@@ -228,6 +257,37 @@ namespace dlib
             DLIB_CASSERT(sub.sample_expansion_factor() == 1);
             DLIB_CASSERT(truth->size() > 0);
             return 0;
+        }
+
+        friend void serialize(const loss_yolo_& item, std::ostream& out)
+        {
+            serialize("loss_yolo_", out);
+            size_t count = tag_count();
+            serialize(count, out);
+            serialize(item.options, out);
+        }
+
+        friend void deserialize(loss_yolo_& item, std::istream& in)
+        {
+            std::string version;
+            deserialize(version, in);
+            if (version != "loss_yolo_")
+                throw serialization_error("Unexpected version found while deserializing dlib::loss_yolo_.");
+            size_t count = 0;
+            deserialize(count, in);
+            if (count != tag_count())
+                throw serialization_error("Invalid number of detection tags " + std::to_string(count) +
+                                          ", while deserializing dlib::loss_yolo_, expecting " +
+                                          std::to_string(tag_count()) + "tags instead.");
+            deserialize(item.options, in);
+        }
+
+        friend std::ostream& operator<<(std::ostream& out, const loss_yolo_& )
+        {
+            out << "loss_yolo\t (" << tag_count() << " output tags: ";
+            list_tags(out);
+            out << ")";
+            return out;
         }
 
     private:

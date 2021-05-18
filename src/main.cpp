@@ -94,6 +94,9 @@ try
     options.overlaps_nms = dlib::test_box_overlap(nms_thresh);
     net_type net(options);
     dlib::deserialize(dnn_path) >> net.subnet();
+    dlib::serialize("yolov3_with_loss.dnn") << net;
+    dlib::deserialize("yolov3_with_loss.dnn") >> net;
+    std::cout << net << std::endl;
 
     if (parser.option("images"))
     {
