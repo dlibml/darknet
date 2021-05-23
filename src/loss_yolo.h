@@ -191,7 +191,8 @@ namespace dlib
                                     }
                                 }
                                 d.detection_confidence *= obj;
-                                dets.push_back(std::move(d));
+                                if (d.detection_confidence > options.conf_thresh)
+                                    dets.push_back(std::move(d));
                             }
                         }
                     }

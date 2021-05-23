@@ -86,6 +86,7 @@ try
     webcam_window win;
 
     dlib::yolo_options options;
+    options.conf_thresh = conf_thresh;
     options.add_anchors<darknet::ytag8>({{10, 13}, {16, 30}, {33, 23}});
     options.add_anchors<darknet::ytag16>({{30, 61}, {62, 45}, {59, 119}});
     options.add_anchors<darknet::ytag32>({{116, 90}, {156, 198}, {373, 326}});;
