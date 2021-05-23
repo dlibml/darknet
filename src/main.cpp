@@ -177,6 +177,7 @@ try
         else
             dlib::assign_image(image, tmp);
         win.clear_overlay();
+        net.loss_details().adjust_threshold(win.conf_thresh);
         const auto t0 = std::chrono::steady_clock::now();
         const auto tform = preprocess_image(image, letterbox, image_size);
         auto detections = net(letterbox);

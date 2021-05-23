@@ -266,6 +266,8 @@ namespace dlib
             return 0;
         }
 
+        void adjust_threshold(float conf_thresh) { options.conf_thresh = conf_thresh; }
+
         friend void serialize(const loss_yolo_& item, std::ostream& out)
         {
             serialize("loss_yolo_", out);
