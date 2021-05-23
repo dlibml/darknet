@@ -86,10 +86,9 @@ try
     webcam_window win;
 
     dlib::yolo_options options;
-    options.anchors = {
-        {8, {{10, 13}, {16, 30}, {33, 23}}},
-        {16, {{30, 61}, {62, 45}, {59, 119}}},
-        {32, {{116, 90}, {156, 198}, {373, 326}}}};
+    options.add_anchors<darknet::ytag8>({{10, 13}, {16, 30}, {33, 23}});
+    options.add_anchors<darknet::ytag16>({{30, 61}, {62, 45}, {59, 119}});
+    options.add_anchors<darknet::ytag32>({{116, 90}, {156, 198}, {373, 326}});;
     options.labels = labels;
     options.overlaps_nms = dlib::test_box_overlap(nms_thresh);
     net_type net(options);
@@ -180,12 +179,12 @@ try
         const auto t0 = std::chrono::steady_clock::now();
         const auto tform = preprocess_image(image, letterbox, image_size);
         auto detections = net(letterbox);
+        postprocess_detections(tform, detections);
         const auto t1 = std::chrono::steady_clock::now();
         rs.add(std::chrono::duration_cast<std::chrono::duration<float>>(t1 - t0).count());
         std::cout << "avg fps: " << 1.0f / rs.mean()
                   << ", #dets: " << dlib::pad(std::to_string(detections.size()), 3) << '\r'
                   << std::flush;
-        postprocess_detections(tform, detections);
         if (out_width > 0)
             dlib::resize_image(static_cast<double>(out_width) / image.nc(), image);
         render_bounding_boxes(image, detections, label_to_color, true);

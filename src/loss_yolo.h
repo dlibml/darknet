@@ -71,6 +71,12 @@ namespace dlib
 
         yolo_options() = default;
 
+        template <template <typename> class TAG_TYPE>
+        void add_anchors(const std::vector<anchor_box_details>& boxes)
+        {
+            anchors[tag_id<TAG_TYPE>::id] = boxes;
+        }
+
         // map between the stride and the anchor boxes
         std::unordered_map<int, std::vector<anchor_box_details>> anchors;
         std::vector<std::string> labels;
@@ -157,7 +163,7 @@ namespace dlib
                 DLIB_CASSERT(net.sample_expansion_factor() == 1, net.sample_expansion_factor());
                 const tensor& t = layer<TAG_TYPE>(net).get_output();
                 const size_t stride = input.nr() / t.nr();
-                const auto& anchors = options.anchors.at(stride);
+                const auto& anchors = options.anchors.at(tag_id<TAG_TYPE>::id);
                 const size_t num_attribs = t.k() / anchors.size();
                 const size_t num_classes = num_attribs - 5;
                 const float* const out = t.host();
