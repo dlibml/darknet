@@ -3,6 +3,8 @@
 
 #include <dlib/dnn.h>
 
+#undef YOLO_DEBUG
+
 namespace dlib
 {
     using yolo_rect = mmod_rect;
@@ -279,7 +281,6 @@ namespace dlib
                 const auto& anchors = options.anchors.at(tag_id<TAG_TYPE>::id);
                 const size_t num_attribs = output_tensor.k() / anchors.size();
                 const size_t num_classes = num_attribs - 5;
-                // std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
 
                 const double scale = 1.0 / (output_tensor.nr() * output_tensor.nc());
                 if (truth->empty())
@@ -297,22 +298,30 @@ namespace dlib
                     }
                     return;
                 }
-
+#ifdef YOLO_DEBUG
+                std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
+#endif
                 const double eps = 1e-9;
                 for (const yolo_rect& truth_box : *truth)
                 {
+                    if (truth_box.ignore)
+                        continue;
                     const auto truth_center = dcenter(truth_box.rect);
                     // const point tc = input_tensor_to_output_tensor(layer<TAG_TYPE>(sub), truth_center);
                     const point tc(truth_center.x() / stride_x, truth_center.y() / stride_y);;
-                    // std::cout << "truth: " << truth_center << " (" << truth_box.rect.width() << 'x' << truth_box.rect.height()  << "), label: " << truth_box.label << std::endl;
-                    // std::cout << "center: " << tc << std::endl;
+#ifdef YOLO_DEBUG
+                    std::cout << "truth: " << truth_center << " (" << truth_box.rect.width() << 'x' << truth_box.rect.height()  << "), label: " << truth_box.label << std::endl;
+                    std::cout << "center: " << tc << std::endl;
+#endif
                     for (size_t a = 0; a < anchors.size(); ++a)
                     {
                         const drectangle anchor = centered_drect(truth_box.rect, anchors[a].width, anchors[a].height);
                         const double inner = truth_box.rect.intersect(anchor).area();
                         const double outer = (truth_box.rect + anchor).area();
                         const double iou = inner / outer;
-                        // std::cout << anchor.width() << 'x' << anchor.height() << ": " << iou << std::endl;
+#ifdef YOLO_DEBUG
+                        std::cout << anchor.width() << 'x' << anchor.height() << ": " << iou << std::endl;
+#endif
                         for (long r = 0; r < output_tensor.nr(); ++r)
                         {
                             for (long c = 0; c < output_tensor.nc(); ++c)
@@ -337,10 +346,16 @@ namespace dlib
                                     float dh = out_data[h_idx];
                                     double target_dx = std::log((eps + truth_center.x() - c * stride_x) / (eps + stride_x * (c + 1) - truth_center.x()));
                                     double target_dy = std::log((eps + truth_center.y() - r * stride_y) / (eps + stride_y * (r + 1) - truth_center.y()));
+                                    if (std::isnan(target_dx) || std::isnan(target_dy))
+                                    {
+                                        continue;
+                                    }
                                     double target_dw = std::log(truth_box.rect.width() / pw);
                                     double target_dh = std::log(truth_box.rect.height() / ph);
-                                    // std::cout << "out: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
-                                    // std::cout << "target: " << target_dx << ' ' << target_dy << ' ' << target_dw << ' ' << target_dh << std::endl;
+#ifdef YOLO_DEBUG
+                                    std::cout << "  out: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
+                                    std::cout << "  target: " << target_dx << ' ' << target_dy << ' ' << target_dw << ' ' << target_dh << std::endl;
+#endif
 
                                     // Compute smoothed L1 loss
                                     dx = dx - target_dx;
@@ -352,8 +367,10 @@ namespace dlib
                                     double ldw = std::abs(dw) < 1 ? 0.5 * dw * dw : std::abs(dw) - 0.5;
                                     double ldh = std::abs(dh) < 1 ? 0.5 * dh * dh : std::abs(dh) - 0.5;
                                     loss += options.lambda_bbr * scale * (ldx + ldy + ldw + ldh);
-                                    // std::cout << "diff: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
-                                    // std::cout << "bbr loss: " << options.lambda_bbr * (ldx + ldy + ldw + ldh) << std::endl;
+#ifdef YOLO_DEBUG
+                                    std::cout << "  diff: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
+                                    std::cout << "  bbr loss: " << scale * options.lambda_bbr * (ldx + ldy + ldw + ldh) << std::endl;
+#endif
 
                                     ldx = put_in_range(-1, 1, dx);
                                     ldy = put_in_range(-1, 1, dy);
@@ -385,8 +402,13 @@ namespace dlib
                                 }
                             }
                         }
+#ifdef YOLO_DEBUG
+                        std::cout << "  loss stride " << stride_x << 'x' << stride_y << ": " << loss << std::endl;
+#endif
                     }
+#ifdef YOLO_DEBUG
                     // std::cin.get();
+#endif
                 }
             }
         };
@@ -457,10 +479,20 @@ namespace dlib
             double loss = 0;
             for (long i = 0; i < input_tensor.num_samples(); ++i)
             {
+#ifdef YOLO_DEBUG
+                std::cout << "sample#: " << i << std::endl;
+#endif
                 double sample_loss = 0;
                 impl::yolo_helper_impl<TAG_TYPES...>::tensor_to_grad(input_tensor, truth, sub, i, options, sample_loss);
                 loss += sample_loss;
+#ifdef YOLO_DEBUG
+                std::cout << "sample loss: " << sample_loss << std::endl;
+                std::cin.get();
+#endif
             }
+#ifdef YOLO_DEBUG
+            std::cout << "batch loss: " << loss / input_tensor.num_samples() << std::endl;
+#endif
             return loss / input_tensor.num_samples();
         }
 
