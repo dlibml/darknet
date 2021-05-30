@@ -81,7 +81,7 @@ namespace dlib
         std::unordered_map<int, std::vector<anchor_box_details>> anchors;
         std::vector<std::string> labels;
         double confidence_threshold = 0.25;
-        float truth_match_iou_threshold = 0.4;
+        float truth_match_iou_threshold = 0.2;
         test_box_overlap overlaps_nms = test_box_overlap(0.45, 1.0);
         test_box_overlap overlaps_ignore = test_box_overlap(0.5, 1.0);
         float lambda_obj = 1.0f;
@@ -232,26 +232,26 @@ namespace dlib
 
             // loss and gradient for a positve sample
             static void binary_loss_log_and_gradient_pos(
-                const float input,
+                const float z,
                 const double scale,
                 double& loss,
                 float& grad
             )
             {
-                loss += scale * log1pexp(-input);
-                grad = scale * (sigmoid(input) - 1);
+                loss += scale * log1pexp(-z);
+                grad = scale * (sigmoid(z) - 1);
             }
 
             // loss and gradient for a negative sample
             static void binary_loss_log_and_gradient_neg(
-                const float input,
+                const float z,
                 const double scale,
                 double& loss,
                 float& grad
             )
             {
-                loss += scale * (input + log1pexp(-input));
-                grad = scale * sigmoid(input);
+                loss += scale * (z + log1pexp(-z));
+                grad = scale * sigmoid(z);
             }
 
             template <
@@ -351,7 +351,7 @@ namespace dlib
                                     double ldy = std::abs(dy) < 1 ? 0.5 * dy * dy : std::abs(dy) - 0.5;
                                     double ldw = std::abs(dw) < 1 ? 0.5 * dw * dw : std::abs(dw) - 0.5;
                                     double ldh = std::abs(dh) < 1 ? 0.5 * dh * dh : std::abs(dh) - 0.5;
-                                    loss += options.lambda_bbr * (ldx + ldy + ldw + ldh);
+                                    loss += options.lambda_bbr * scale * (ldx + ldy + ldw + ldh);
                                     // std::cout << "diff: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
                                     // std::cout << "bbr loss: " << options.lambda_bbr * (ldx + ldy + ldw + ldh) << std::endl;
 
@@ -360,10 +360,10 @@ namespace dlib
                                     ldw = put_in_range(-1, 1, dw);
                                     ldh = put_in_range(-1, 1, dh);
 
-                                    g[x_idx] += scale * options.lambda_bbr * ldx;
-                                    g[y_idx] += scale * options.lambda_bbr * ldy;
-                                    g[w_idx] += scale * options.lambda_bbr * ldw;
-                                    g[h_idx] += scale * options.lambda_bbr * ldh;
+                                    g[x_idx] = scale * options.lambda_bbr * ldx;
+                                    g[y_idx] = scale * options.lambda_bbr * ldy;
+                                    g[w_idx] = scale * options.lambda_bbr * ldw;
+                                    g[h_idx] = scale * options.lambda_bbr * ldh;
 
                                     // Perform class loss
                                     const size_t l_idx = std::find(options.labels.begin(),
