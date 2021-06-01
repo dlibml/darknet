@@ -3,7 +3,7 @@
 
 #include <dlib/dnn.h>
 
-#undef DLIB_YOLO_DEBUG
+#define DLIB_YOLO_DEBUG
 
 namespace dlib
 {
@@ -233,7 +233,7 @@ namespace dlib
             }
 
             // loss and gradient for a positve sample
-            static void binary_loss_log_and_gradient_pos(
+            static inline void binary_loss_log_and_gradient_pos(
                 const float z,
                 const double scale,
                 double& loss,
@@ -241,11 +241,11 @@ namespace dlib
             )
             {
                 loss += scale * log1pexp(-z);
-                grad = scale * (sigmoid(z) - 1);
+                grad += scale * (sigmoid(z) - 1);
             }
 
             // loss and gradient for a negative sample
-            static void binary_loss_log_and_gradient_neg(
+            static inline void binary_loss_log_and_gradient_neg(
                 const float z,
                 const double scale,
                 double& loss,
@@ -253,18 +253,13 @@ namespace dlib
             )
             {
                 loss += scale * (z + log1pexp(-z));
-                grad = scale * sigmoid(z);
+                grad += scale * sigmoid(z);
             }
 
-            struct match_details
+            static inline double compute_iou(const yolo_rect& a, const yolo_rect& b)
             {
-                yolo_rect truth;
-                size_t idx;
-                double iou;
-                long r;
-                long c;
-                dpoint center;
-            };
+                return a.rect.intersect(b.rect).area() / static_cast<double>((a.rect + b.rect).area());
+            }
 
             template <
                 typename const_label_iterator,
@@ -291,70 +286,10 @@ namespace dlib
                 const auto& anchors = options.anchors.at(tag_id<TAG_TYPE>::id);
                 const long num_attribs = output_tensor.k() / anchors.size();
                 const long num_classes = num_attribs - 5;
-
                 const double scale = 1.0 / (output_tensor.nr() * output_tensor.nc());
-
-                const auto noobj_grad_anchor = [&](size_t a)
-                {
-                    for (long r = 0; r < output_tensor.nr(); ++r)
-                    {
-                        for (long c = 0; c < output_tensor.nc(); ++c)
-                        {
-                            const auto obj_idx = tensor_index(output_tensor, n, a * num_attribs + 4, r, c);
-                            binary_loss_log_and_gradient_neg(out_data[obj_idx], scale * options.lambda_noobj, loss, g[obj_idx]);
-                        }
-                    }
-                };
 
                 if (truth->empty())
                 {
-                    for (size_t a = 0; a < anchors.size(); ++a)
-                    {
-                        noobj_grad_anchor(a);
-                    }
-                    return;
-                }
-
-#ifdef DLIB_YOLO_DEBUG
-                std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
-#endif
-                for (const yolo_rect& truth_box : *truth)
-                {
-                    if (truth_box.ignore)
-                        continue;
-                    // force all bounding boxes to be inside of the image
-                    std::vector<match_details> candidates;
-                    for (size_t a = 0; a < anchors.size(); ++a)
-                    {
-                        match_details md;
-                        md.idx = a;
-                        md.truth = truth_box;
-                        const drectangle anchor(centered_drect(md.center, anchors[a].width, anchors[a].height));
-                        md.iou = truth_box.rect.intersect(anchor).area() / static_cast<double>((truth_box.rect + anchor).area());
-                        md.c = md.center.x() / stride_x;
-                        md.r = md.center.y() / stride_y;
-                        md.center = dcenter(md.truth.rect);
-                        if (md.iou > options.truth_match_iou_threshold)
-                        {
-                            candidates.push_back(std::move(md));
-                        }
-                        else
-                        {
-                            noobj_grad_anchor(a);
-                        }
-                    }
-
-                    if (candidates.empty())
-                        continue;
-
-                    const match_details best = *std::max_element(candidates.begin(), candidates.end(),
-                                                [](const auto& a, const auto&b)
-                                                { return a.iou < b.iou ; });
-#ifdef DLIB_YOLO_DEBUG
-                    std::cout << "truth: " << best.center << ": " << best.truth.rect.width() << "x" << best.truth.rect.height() << std::endl;
-                    std::cout << "anchor " << best.idx << ": " << anchors[best.idx].height << 'x' << anchors[best.idx].width << std::endl;
-                    std::cout << "IoU: " << best.iou << std::endl;
-#endif
                     for (size_t a = 0; a < anchors.size(); ++a)
                     {
                         for (long r = 0; r < output_tensor.nr(); ++r)
@@ -362,72 +297,89 @@ namespace dlib
                             for (long c = 0; c < output_tensor.nc(); ++c)
                             {
                                 const auto obj_idx = tensor_index(output_tensor, n, a * num_attribs + 4, r, c);
+                                binary_loss_log_and_gradient_neg(out_data[obj_idx], scale * options.lambda_noobj, loss, g[obj_idx]);
+                            }
+                        }
+                    }
+                    return;
+                }
 
-                                // This cells don't contain objects
-                                if (!(r == best.r && c == best.c))
-                                {
-                                    binary_loss_log_and_gradient_neg(out_data[obj_idx], scale * options.lambda_noobj, loss, g[obj_idx]);
-                                    continue;
-                                }
-
-                                // This cell contains an object
-
-                                // Compute the classification loss
-                                const long l_idx = std::find(options.labels.begin(),
-                                                     options.labels.end(),
-                                                     truth_box.label) - options.labels.begin();
-
-                                for (long k = 0; k < num_classes; ++k)
-                                {
-                                    const size_t cls_idx = tensor_index(output_tensor, n, a * num_attribs + 5 + k, r, c);
-                                    if (k == l_idx)
-                                        binary_loss_log_and_gradient_pos(out_data[cls_idx], scale * options.lambda_cls, loss, g[cls_idx]);
-                                    else
-                                        binary_loss_log_and_gradient_neg(out_data[cls_idx], scale * options.lambda_cls, loss, g[cls_idx]);
-                                }
-
-                                if (a != best.idx)
-                                {
-                                    binary_loss_log_and_gradient_neg(out_data[obj_idx], scale * options.lambda_noobj, loss, g[obj_idx]);
-                                    continue;
-                                }
-
-                                // This anchor box is responsible for the detection of the object
-
-                                const auto x_idx = tensor_index(output_tensor, n, a * num_attribs + 0, r, c);
-                                const auto y_idx = tensor_index(output_tensor, n, a * num_attribs + 1, r, c);
-                                const auto w_idx = tensor_index(output_tensor, n, a * num_attribs + 2, r, c);
-                                const auto h_idx = tensor_index(output_tensor, n, a * num_attribs + 3, r, c);
-
-                                double pw = anchors[a].width;
-                                double ph = anchors[a].height;
-                                float dx = out_data[x_idx];
-                                float dy = out_data[y_idx];
-                                float dw = out_data[w_idx];
-                                float dh = out_data[h_idx];
-                                // double target_dx = std::log((eps + best.center.x() - c * stride_x) / (eps + stride_x * (c + 1) - best.center.x()));
-                                // double target_dy = std::log((eps + best.center.y() - r * stride_y) / (eps + stride_y * (r + 1) - best.center.y()));
-                                const double target_dx = best.center.x() / stride_x - c;
-                                const double target_dy = best.center.y() / stride_y - r;
-                                const double target_dw = std::log(truth_box.rect.width() / pw);
-                                const double target_dh = std::log(truth_box.rect.height() / ph);
-                                drectangle pred = centered_drect(
-                                    dpoint((sigmoid(dx) + c) * stride_x, (sigmoid(dy) + r) * stride_y),
-                                    std::exp(dw) * anchors[a].width,
-                                    std::exp(dh) * anchors[a].height
-                                );
-                                const double iou = truth_box.rect.intersect(pred).area() / static_cast<double>((truth_box.rect + pred).area());
 #ifdef DLIB_YOLO_DEBUG
+                std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
+#endif
+                for (long r = 0; r < output_tensor.nr(); ++r)
+                {
+                    for (long c = 0; c < output_tensor.nc(); ++c)
+                    {
+                        for (size_t a = 0; a < anchors.size(); ++a)
+                        {
+                            const auto x_idx = tensor_index(output_tensor, n, a * num_attribs + 0, r, c);
+                            const auto y_idx = tensor_index(output_tensor, n, a * num_attribs + 1, r, c);
+                            const auto w_idx = tensor_index(output_tensor, n, a * num_attribs + 2, r, c);
+                            const auto h_idx = tensor_index(output_tensor, n, a * num_attribs + 3, r, c);
+                            const auto o_idx = tensor_index(output_tensor, n, a * num_attribs + 4, r, c);
+                            const auto c_idx = tensor_index(output_tensor, n, a * num_attribs + 5, r, c);
+
+                            // the prediction at r, c for anchor a
+                            yolo_rect pred(centered_drect(
+                                dpoint((sigmoid(out_data[x_idx]) + c) * stride_x, (sigmoid(out_data[y_idx]) + r) * stride_y),
+                                std::exp(out_data[w_idx]) * anchors[a].width,
+                                std::exp(out_data[h_idx]) * anchors[a].height),
+                                0
+                            );
+                            for (long k = 0; k < num_classes; ++k)
+                            {
+                                const float p = sigmoid(out_data[c_idx + k]);
+                                if (p > pred.detection_confidence)
+                                {
+                                    pred.detection_confidence = p;
+                                    pred.label = options.labels[k];
+                                }
+                            }
+
+                            // find the truth that best matches the current detection
+                            double best_iou = 0;
+                            size_t best_t = 0;
+                            for (size_t t = 0; t < truth->size(); ++t)
+                            {
+                                const yolo_rect& truth_box = (*truth)[t];
+                                if (truth_box.ignore)
+                                    continue;
+                                double iou = compute_iou(truth_box, pred);
+                                if (iou > best_iou)
+                                {
+                                    best_iou = iou;
+                                    best_t = t;
+                                }
+                            }
+#ifdef DLIB_YOLO_DEBUG
+                            std::cout << "pred: " << pred.label << " " << dcenter(pred) << " " << pred.rect.width() << 'x' << pred.rect.height() << std::endl;
+                            const yolo_rect& tb = (*truth)[best_t];
+                            std::cout << "truth: " << tb.label << " " << dcenter(tb) << " " << tb.rect.width() << 'x' << tb.rect.height() << std::endl;
+                            std::cout << "  iou: " << best_iou << std::endl;
+#endif
+
+                            if (best_iou > options.truth_match_iou_threshold)
+                            {
+                                binary_loss_log_and_gradient_pos(out_data[o_idx], scale * options.lambda_obj, loss, g[o_idx]);
+                                const yolo_rect& truth_box = (*truth)[best_t];
+                                const dpoint t_center = dcenter(truth_box);
+                                const double target_dx = t_center.x() / stride_x - c;
+                                const double target_dy = t_center.y() / stride_y - r;
+                                const auto target_dw = std::log(truth_box.rect.width() / static_cast<double>(anchors[a].width));
+                                const auto target_dh = std::log(truth_box.rect.height() / static_cast<double>(anchors[a].height));
+                                const float dx = out_data[x_idx] - target_dx;
+                                const float dy = out_data[y_idx] - target_dy;
+                                const float dw = out_data[w_idx] - target_dw;
+                                const float dh = out_data[h_idx] - target_dh;
+#ifdef DLIB_YOLO_DEBUG
+                                std::cout << "  strides: " << stride_x << ' ' << stride_y << std::endl;
+                                std::cout << "  col row: " << c << ' ' << r << std::endl;
                                 std::cout << "  out: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
                                 std::cout << "  target: " << target_dx << ' ' << target_dy << ' ' << target_dw << ' ' << target_dh << std::endl;
-                                std::cout << "  iou: " << iou << std::endl;
 #endif
 
                                 // Compute smoothed L1 loss
-                                dx = dx - target_dx;
-                                dy = dy - target_dy;
-                                dw = dw - target_dw;
-                                dh = dh - target_dh;
                                 double ldx = std::abs(dx) < 1 ? 0.5 * dx * dx : std::abs(dx) - 0.5;
                                 double ldy = std::abs(dy) < 1 ? 0.5 * dy * dy : std::abs(dy) - 0.5;
                                 double ldw = std::abs(dw) < 1 ? 0.5 * dw * dw : std::abs(dw) - 0.5;
@@ -436,31 +388,35 @@ namespace dlib
 #ifdef DLIB_YOLO_DEBUG
                                 std::cout << "  diff: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
                                 std::cout << "  bbr loss: " << scale * options.lambda_bbr * (ldx + ldy + ldw + ldh) << std::endl;
+                                std::cin.get();
 #endif
 
+                                // Use the loss as the gradient
                                 ldx = put_in_range(-1, 1, dx);
                                 ldy = put_in_range(-1, 1, dy);
                                 ldw = put_in_range(-1, 1, dw);
                                 ldh = put_in_range(-1, 1, dh);
-
                                 g[x_idx] = scale * options.lambda_bbr * ldx;
                                 g[y_idx] = scale * options.lambda_bbr * ldy;
                                 g[w_idx] = scale * options.lambda_bbr * ldw;
                                 g[h_idx] = scale * options.lambda_bbr * ldh;
 
-                                const double iou_scale = -safe_log(1 / std::max(1e-9, iou) - 1);
-                                binary_loss_log_and_gradient_pos(out_data[obj_idx], iou_scale * scale * options.lambda_obj, loss, g[obj_idx]);
-
+                                // Compute binary cross-entropy loss
+                                for (long k = 0; k < num_classes; ++k)
+                                {
+                                    if (truth_box.label == options.labels[k])
+                                        binary_loss_log_and_gradient_pos(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
+                                    else
+                                        binary_loss_log_and_gradient_neg(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
+                                }
+                            }
+                            else
+                            {
+                                binary_loss_log_and_gradient_neg(out_data[o_idx], scale * options.lambda_noobj, loss, g[o_idx]);
                             }
                         }
                     }
-#ifdef DLIB_YOLO_DEBUG
-                        std::cout << "  loss stride " << stride_x << 'x' << stride_y << ": " << loss << std::endl;
-#endif
                 }
-#ifdef DLIB_YOLO_DEBUG
-                    // std::cin.get();
-#endif
             }
         };
 
