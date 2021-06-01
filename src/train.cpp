@@ -17,7 +17,7 @@ int main(const int argc, const char** argv)
 try
 {
     command_line_parser parser;
-    parser.add_option("learning-rate", "initial learning rate (default: 0.1)", 1);
+    parser.add_option("learning-rate", "initial learning rate (default: 0.01)", 1);
     parser.add_option("batch-size", "mini batch size (default: 8)", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias of --help");
@@ -29,7 +29,7 @@ try
         cout << "Give the path to a folder containing the training.xml file." << endl;
         return 0;
     }
-    const double learning_rate = get_option(parser, "learning-rate", 0.1);
+    const double learning_rate = get_option(parser, "learning-rate", 0.01);
     const size_t batch_size = get_option(parser, "batch-size", 8);
     const std::string data_directory = parser[0];
     image_dataset_metadata::dataset dataset;
@@ -67,7 +67,7 @@ try
     trainer.set_learning_rate(learning_rate);
     trainer.set_mini_batch_size(batch_size);
     trainer.set_min_learning_rate(1e-5);
-    trainer.set_synchronization_file("yolov3_voc2012_sync", std::chrono::minutes(15));
+    trainer.set_synchronization_file("yolov3_sync", std::chrono::minutes(15));
     std::cout << trainer << std::endl;
 
     dlib::pipe<std::pair<matrix<rgb_pixel>, std::vector<yolo_rect>>> train_data(1000);

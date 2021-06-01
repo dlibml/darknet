@@ -6,8 +6,8 @@
 #include <dlib/dir_nav.h>
 #include <dlib/image_io.h>
 
-using net_type =
-    dlib::loss_yolo<darknet::ytag8, darknet::ytag16, darknet::ytag32, darknet::yolov3_infer>;
+using darknet::ytag8, darknet::ytag16, darknet::ytag32;
+using net_type = dlib::loss_yolo<ytag8, ytag16, ytag32, darknet::yolov3_infer>;
 
 const static std::string exts{".jpg .JPG .jpeg .JPEG .png .PNG .gif .GIF"};
 
@@ -86,16 +86,24 @@ try
     webcam_window win;
 
     dlib::yolo_options options;
-    options.conf_thresh = conf_thresh;
-    options.add_anchors<darknet::ytag8>({{10, 13}, {16, 30}, {33, 23}});
-    options.add_anchors<darknet::ytag16>({{30, 61}, {62, 45}, {59, 119}});
-    options.add_anchors<darknet::ytag32>({{116, 90}, {156, 198}, {373, 326}});;
+    options.confidence_threshold = conf_thresh;
+    options.add_anchors<ytag8>({{10, 13}, {16, 30}, {33, 23}});
+    options.add_anchors<ytag16>({{30, 61}, {62, 45}, {59, 119}});
+    options.add_anchors<ytag32>({{116, 90}, {156, 198}, {373, 326}});
     options.labels = labels;
     options.overlaps_nms = dlib::test_box_overlap(nms_thresh);
     net_type net(options);
-    dlib::deserialize(dnn_path) >> net.subnet();
-    dlib::serialize("yolov3_with_loss.dnn") << net;
-    dlib::deserialize("yolov3_with_loss.dnn") >> net;
+    {
+        using train_type = dlib::loss_yolo<ytag8, ytag16, ytag32, darknet::yolov3_train>;
+        train_type temp;
+        auto trainer = dlib::dnn_trainer(temp);
+        trainer.set_synchronization_file("yolov3_sync");
+        trainer.get_net(dlib::force_flush_to_disk::no);
+        net.subnet() = temp.subnet();
+    }
+    // dlib::deserialize(dnn_path) >> net.subnet();
+    // dlib::serialize("yolov3_with_loss.dnn") << net;
+    // dlib::deserialize("yolov3_with_loss.dnn") >> net;
     std::cout << net << std::endl;
 
     if (parser.option("images"))
