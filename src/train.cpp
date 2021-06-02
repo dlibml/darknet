@@ -19,6 +19,8 @@ try
     command_line_parser parser;
     parser.add_option("learning-rate", "initial learning rate (default: 0.01)", 1);
     parser.add_option("batch-size", "mini batch size (default: 8)", 1);
+    parser.add_option("burnin", "number of warmup steps (default: 5000)", 1);
+    parser.add_option("steps", "number of training steps (defaule: 100000)", 1);
     parser.set_group_name("Help Options");
     parser.add_option("h", "alias of --help");
     parser.add_option("help", "display this message and exit");
@@ -31,6 +33,8 @@ try
     }
     const double learning_rate = get_option(parser, "learning-rate", 0.01);
     const size_t batch_size = get_option(parser, "batch-size", 8);
+    const size_t burnin = get_option(parser, "burnin", 5000);
+    const size_t steps = get_option(parser, "steps", 100000);
     const std::string data_directory = parser[0];
     image_dataset_metadata::dataset dataset;
     image_dataset_metadata::load_image_dataset_metadata(dataset, data_directory + "/training.xml");
@@ -61,6 +65,12 @@ try
     net_type net(options);
     darknet::setup_detector(net, options.labels.size());
 
+    // Cosine scheduler with burn-in
+    const matrix<double> learning_rate_schedule = learning_rate * join_rows(
+        linspace(0, 1, burnin),
+        ((1 + cos(pi / (steps - burnin) * linspace(0, steps - burnin, steps - burnin))) / 2)
+    ) + std::numeric_limits<double>::epsilon();
+
     dnn_trainer<net_type> trainer(net, sgd(0.0005, 0.9));
     trainer.be_verbose();
     trainer.set_iterations_without_progress_threshold(5000);
@@ -68,7 +78,10 @@ try
     trainer.set_mini_batch_size(batch_size);
     trainer.set_min_learning_rate(1e-5);
     trainer.set_synchronization_file("yolov3_sync", std::chrono::minutes(15));
-    std::cout << trainer << std::endl;
+    trainer.set_learning_rate_schedule(learning_rate_schedule);
+    std::cout << trainer;
+    std::cout << "  burnin: " << burnin << std::endl;
+    std::cout << "  #steps: " << steps << std::endl;
 
     dlib::pipe<std::pair<matrix<rgb_pixel>, std::vector<yolo_rect>>> train_data(1000);
     auto loader = [&dataset, &data_directory, &train_data](time_t seed) {
@@ -111,7 +124,7 @@ try
 
     std::vector<matrix<rgb_pixel>> images;
     std::vector<std::vector<yolo_rect>> bboxes;
-    while (trainer.get_learning_rate() > trainer.get_min_learning_rate())
+    while (trainer.get_train_one_step_calls() < steps)
     {
         images.clear();
         bboxes.clear();
