@@ -3,8 +3,6 @@
 
 #include <dlib/dnn.h>
 
-#undef DLIB_YOLO_DEBUG
-
 namespace dlib
 {
     using yolo_rect = mmod_rect;
@@ -12,35 +10,6 @@ namespace dlib
     {
         return lhs.detection_confidence < rhs.detection_confidence;
     }
-
-    // struct yolo_rect
-    // {
-    //     yolo_rect(const drectangle& r) : rect(r) {}
-    //     yolo_rect(const drectangle& r, double score) : rect(r), detection_confidence(score) {}
-    //     yolo_rect(const drectangle& r, double score, const std::string& label)
-    //         : rect(r),
-    //           detection_confidence(score),
-    //           label(label)
-    //     {
-    //     }
-    //     drectangle rect;
-    //     double detection_confidence = 0;
-    //     bool ignore = false;
-    //     std::string label;
-
-    //     operator rectangle() const { return rect; }
-
-    //     bool operator==(const mmod_rect& rhs) const
-    //     {
-    //         return rect == rhs.rect && detection_confidence == rhs.detection_confidence &&
-    //                ignore == rhs.ignore && label == rhs.label;
-    //     }
-
-    //     bool operator<(const yolo_rect& item) const
-    //     {
-    //         return detection_confidence < item.detection_confidence;
-    //     }
-    // };
 
     // clang-format off
     struct yolo_options
@@ -83,7 +52,7 @@ namespace dlib
         std::unordered_map<int, std::vector<anchor_box_details>> anchors;
         std::vector<std::string> labels;
         double confidence_threshold = 0.25;
-        float truth_match_iou_threshold = 0.5;
+        float ignore_iou_threshold = 0.7;
         test_box_overlap overlaps_nms = test_box_overlap(0.45, 1.0);
         test_box_overlap overlaps_ignore = test_box_overlap(0.5, 1.0);
         float lambda_obj = 1.0f;
@@ -99,7 +68,7 @@ namespace dlib
         serialize(version, out);
         serialize(item.anchors, out);
         serialize(item.confidence_threshold, out);
-        serialize(item.truth_match_iou_threshold, out);
+        serialize(item.ignore_iou_threshold, out);
         serialize(item.overlaps_nms, out);
         serialize(item.overlaps_ignore, out);
         serialize(item.lambda_obj, out);
@@ -115,7 +84,7 @@ namespace dlib
             throw serialization_error("Unexpected version found while deserializing dlib::yolo_options.");
         deserialize(item.anchors, in);
         deserialize(item.confidence_threshold, in);
-        deserialize(item.truth_match_iou_threshold, in);
+        deserialize(item.ignore_iou_threshold, in);
         deserialize(item.overlaps_nms, in);
         deserialize(item.overlaps_ignore, in);
         deserialize(item.lambda_obj, in);
@@ -256,11 +225,6 @@ namespace dlib
                 grad += scale * sigmoid(z);
             }
 
-            static inline void smoothed_l1_loss_and_grad()
-            {
-                // TODO: I should probably abstract the loss here
-            }
-
             static inline double compute_iou(const yolo_rect& a, const yolo_rect& b)
             {
                 return a.rect.intersect(b.rect).area() / static_cast<double>((a.rect + b.rect).area());
@@ -307,10 +271,7 @@ namespace dlib
                     return;
                 }
 
-#ifdef DLIB_YOLO_DEBUG
-                std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
-#endif
-                // Compute loss and gradient for all cells capable of detecting the truth objects
+                // Compute the objectness loss for all grid cells
                 for (long r = 0; r < output_tensor.nr(); ++r)
                 {
                     for (long c = 0; c < output_tensor.nc(); ++c)
@@ -322,7 +283,6 @@ namespace dlib
                             const auto w_idx = tensor_index(output_tensor, n, a * num_feats + 2, r, c);
                             const auto h_idx = tensor_index(output_tensor, n, a * num_feats + 3, r, c);
                             const auto o_idx = tensor_index(output_tensor, n, a * num_feats + 4, r, c);
-                            const auto c_idx = tensor_index(output_tensor, n, a * num_feats + 5, r, c);
 
                             // The prediction at r, c for anchor a
                             yolo_rect pred(centered_drect(
@@ -331,83 +291,20 @@ namespace dlib
                                 std::exp(out_data[h_idx]) * anchors[a].height)
                             );
 
-                            // find the truth that best matches the current detection
+                            // Find the truth and IoU that best match the current detection
                             double best_iou = 0;
-                            size_t best_t = 0;
                             for (size_t t = 0; t < truth->size(); ++t)
                             {
                                 const yolo_rect& truth_box = (*truth)[t];
                                 if (truth_box.ignore)
                                     continue;
-                                const double iou = compute_iou(truth_box, pred);
-                                if (iou > best_iou)
-                                {
-                                    best_iou = iou;
-                                    best_t = t;
-                                }
+                                best_iou = std::max(best_iou, compute_iou(truth_box, pred));
                             }
-#ifdef DLIB_YOLO_DEBUG
-                            std::cout << "pred: " << pred.label << " " << dcenter(pred) << " " << pred.rect.width() << 'x' << pred.rect.height() << std::endl;
-                            const yolo_rect& tb = (*truth)[best_t];
-                            std::cout << "truth: " << tb.label << " " << dcenter(tb) << " " << tb.rect.width() << 'x' << tb.rect.height() << std::endl;
-                            std::cout << "  iou: " << best_iou << std::endl;
-#endif
 
-                            if (best_iou > options.truth_match_iou_threshold)
-                            {
-                                binary_loss_log_and_gradient_pos(out_data[o_idx], scale * options.lambda_obj, loss, g[o_idx]);
-                                const yolo_rect& truth_box = (*truth)[best_t];
-                                const dpoint t_center = dcenter(truth_box);
-                                const double target_dx = t_center.x() / stride_x - c;
-                                const double target_dy = t_center.y() / stride_y - r;
-                                const double target_dw = std::log(truth_box.rect.width() / static_cast<double>(anchors[a].width));
-                                const double target_dh = std::log(truth_box.rect.height() / static_cast<double>(anchors[a].height));
-                                const double dx = out_data[x_idx] - target_dx;
-                                const double dy = out_data[y_idx] - target_dy;
-                                const double dw = out_data[w_idx] - target_dw;
-                                const double dh = out_data[h_idx] - target_dh;
-#ifdef DLIB_YOLO_DEBUG
-                                std::cout << "  strides: " << stride_x << ' ' << stride_y << std::endl;
-                                std::cout << "  col row: " << c << ' ' << r << std::endl;
-                                std::cout << "  out: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
-                                std::cout << "  target: " << target_dx << ' ' << target_dy << ' ' << target_dw << ' ' << target_dh << std::endl;
-#endif
-
-                                // Compute smoothed L1 loss
-                                double ldx = std::abs(dx) < 1 ? 0.5 * dx * dx : std::abs(dx) - 0.5;
-                                double ldy = std::abs(dy) < 1 ? 0.5 * dy * dy : std::abs(dy) - 0.5;
-                                double ldw = std::abs(dw) < 1 ? 0.5 * dw * dw : std::abs(dw) - 0.5;
-                                double ldh = std::abs(dh) < 1 ? 0.5 * dh * dh : std::abs(dh) - 0.5;
-                                loss += options.lambda_bbr * scale * (ldx + ldy + ldw + ldh);
-#ifdef DLIB_YOLO_DEBUG
-                                std::cout << "  diff: " << dx << ' ' << dy << ' ' << dw << ' ' << dh << std::endl;
-                                std::cout << "  bbr loss: " << scale * options.lambda_bbr * (ldx + ldy + ldw + ldh) << std::endl;
-                                std::cin.get();
-#endif
-
-                                // Use the loss as the gradient
-                                ldx = put_in_range(-1, 1, dx);
-                                ldy = put_in_range(-1, 1, dy);
-                                ldw = put_in_range(-1, 1, dw);
-                                ldh = put_in_range(-1, 1, dh);
-                                g[x_idx] += scale * options.lambda_bbr * ldx;
-                                g[y_idx] += scale * options.lambda_bbr * ldy;
-                                g[w_idx] += scale * options.lambda_bbr * ldw;
-                                g[h_idx] += scale * options.lambda_bbr * ldh;
-
-                                // Compute binary cross-entropy loss
-                                for (long k = 0; k < num_classes; ++k)
-                                {
-                                    if (truth_box.label == options.labels[k])
-                                        binary_loss_log_and_gradient_pos(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
-                                    else
-                                        binary_loss_log_and_gradient_neg(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
-                                }
-                            }
+                            if (best_iou > options.ignore_iou_threshold)
+                                g[o_idx] = 0;
                             else
-                            {
                                 binary_loss_log_and_gradient_neg(out_data[o_idx], scale * options.lambda_noobj, loss, g[o_idx]);
-                            }
                         }
                     }
                 }
