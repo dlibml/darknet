@@ -232,7 +232,7 @@ namespace dlib
                 }
             }
 
-            // loss and gradient for a positve sample
+            // Loss and gradient for a positve sample
             static inline void binary_loss_log_and_gradient_pos(
                 const float z,
                 const double scale,
@@ -244,7 +244,7 @@ namespace dlib
                 grad += scale * (sigmoid(z) - 1);
             }
 
-            // loss and gradient for a negative sample
+            // Loss and gradient for a negative sample
             static inline void binary_loss_log_and_gradient_neg(
                 const float z,
                 const double scale,
@@ -280,14 +280,12 @@ namespace dlib
             )
             {
                 const tensor& output_tensor = layer<TAG_TYPE>(sub).get_output();
-                tensor& grad = layer<TAG_TYPE>(sub).get_gradient_input();
                 const float* const out_data = output_tensor.host();
-                float* g = grad.host_write_only();
-                for (size_t i = 0; i < grad.size(); ++i)
-                    g[i] = 0;
+                tensor& grad = layer<TAG_TYPE>(sub).get_gradient_input();
+                float* g = grad.host();
+
                 const auto stride_x = static_cast<double>(input_tensor.nc()) / output_tensor.nc();
                 const auto stride_y = static_cast<double>(input_tensor.nr()) / output_tensor.nr();
-
                 const auto& anchors = options.anchors.at(tag_id<TAG_TYPE>::id);
                 const long num_feats = output_tensor.k() / anchors.size();
                 const long num_classes = num_feats - 5;
@@ -312,6 +310,7 @@ namespace dlib
 #ifdef DLIB_YOLO_DEBUG
                 std::cout << "stride: " << stride_x << 'x' << stride_y << std::endl;
 #endif
+                // Compute loss and gradient for all cells capable of detecting the truth objects
                 for (long r = 0; r < output_tensor.nr(); ++r)
                 {
                     for (long c = 0; c < output_tensor.nc(); ++c)
@@ -325,22 +324,12 @@ namespace dlib
                             const auto o_idx = tensor_index(output_tensor, n, a * num_feats + 4, r, c);
                             const auto c_idx = tensor_index(output_tensor, n, a * num_feats + 5, r, c);
 
-                            // the prediction at r, c for anchor a
+                            // The prediction at r, c for anchor a
                             yolo_rect pred(centered_drect(
                                 dpoint((sigmoid(out_data[x_idx]) + c) * stride_x, (sigmoid(out_data[y_idx]) + r) * stride_y),
                                 std::exp(out_data[w_idx]) * anchors[a].width,
-                                std::exp(out_data[h_idx]) * anchors[a].height),
-                                0
+                                std::exp(out_data[h_idx]) * anchors[a].height)
                             );
-                            for (long k = 0; k < num_classes; ++k)
-                            {
-                                const float p = sigmoid(out_data[c_idx + k]);
-                                if (p > pred.detection_confidence)
-                                {
-                                    pred.detection_confidence = p;
-                                    pred.label = options.labels[k];
-                                }
-                            }
 
                             // find the truth that best matches the current detection
                             double best_iou = 0;
@@ -433,12 +422,11 @@ namespace dlib
                     const long r = t_center.y() / stride_y;
                     double best_iou = 0;
                     size_t best_a = 0;
-                    yolo_rect pred;
                     for (size_t a = 0; a < anchors.size(); ++a)
                     {
                         const auto w_idx = tensor_index(output_tensor, n, a * num_feats + 2, r, c);
                         const auto h_idx = tensor_index(output_tensor, n, a * num_feats + 3, r, c);
-                        pred = yolo_rect(centered_drect(
+                        yolo_rect pred(centered_drect(
                             t_center,
                             std::exp(out_data[w_idx]) * anchors[a].width,
                             std::exp(out_data[h_idx]) * anchors[a].height)
@@ -453,9 +441,7 @@ namespace dlib
 
                     // the prediction was less than one pixel wide or long
                     if (best_iou == 0)
-                    {
                         continue;
-                    }
 
                     const auto x_idx = tensor_index(output_tensor, n, best_a * num_feats + 0, r, c);
                     const auto y_idx = tensor_index(output_tensor, n, best_a * num_feats + 1, r, c);
