@@ -428,9 +428,8 @@ namespace dlib
                 final_dets.clear();
                 for (size_t j = 0; j < dets_accum.size(); ++j)
                 {
-                    if (overlaps_any_box_nms(final_dets, dets_accum[j].rect))
+                    if (overlaps_any_box_nms(final_dets, dets_accum[j]))
                         continue;
-
                     final_dets.push_back(dets_accum[j]);
                 }
 
@@ -498,16 +497,26 @@ namespace dlib
 
         yolo_options options;
 
-        template <typename T>
         inline bool overlaps_any_box_nms (
-            const std::vector<T>& rects,
-            const drectangle& rect
+            const std::vector<yolo_rect>& boxes,
+            const yolo_rect& box,
+            const bool classwise = false
         ) const
         {
-            for (const auto& r : rects)
+            for (const auto& b : boxes)
             {
-                if (options.overlaps_nms(r.rect, rect))
-                    return true;
+                if (options.overlaps_nms(b.rect, box.rect))
+                {
+                    if (classwise)
+                    {
+                        if (b.label == box.label)
+                            return true;
+                    }
+                    else
+                    {
+                        return true;
+                    }
+                }
             }
             return false;
         }
