@@ -211,7 +211,7 @@ namespace dlib
             )
             {
                 loss += scale * log1pexp(-z);
-                grad += scale * (sigmoid(z) - 1);
+                grad = scale * (sigmoid(z) - 1);
             }
 
             // Loss and gradient for a negative sample
@@ -223,7 +223,7 @@ namespace dlib
             )
             {
                 loss += scale * (z + log1pexp(-z));
-                grad += scale * sigmoid(z);
+                grad = scale * sigmoid(z);
             }
 
             static inline double compute_iou(const yolo_rect& a, const yolo_rect& b)
@@ -294,7 +294,7 @@ namespace dlib
                     }
                 }
 
-                // Now find the grid cell and anchor box centered at each truth box
+                // Now find the best anchor box for each truth box
                 for (const yolo_rect& truth_box : *truth)
                 {
                     if (truth_box.ignore)
@@ -306,14 +306,8 @@ namespace dlib
                     size_t best_a = 0;
                     for (size_t a = 0; a < anchors.size(); ++a)
                     {
-                        const auto w_idx = tensor_index(output_tensor, n, a * num_feats + 2, r, c);
-                        const auto h_idx = tensor_index(output_tensor, n, a * num_feats + 3, r, c);
-                        yolo_rect pred(centered_drect(
-                            t_center,
-                            std::exp(out_data[w_idx]) * anchors[a].width,
-                            std::exp(out_data[h_idx]) * anchors[a].height)
-                        );
-                        const double iou = compute_iou(truth_box, pred);
+                        const yolo_rect anchor(centered_drect(t_center, anchors[a].width, anchors[a].height));
+                        const double iou = compute_iou(truth_box, anchor);
                         if (iou > best_iou)
                         {
                             best_iou = iou;
@@ -321,16 +315,13 @@ namespace dlib
                         }
                     }
 
-                    // the prediction was less than one pixel wide or long
-                    if (best_iou == 0)
-                        continue;
+                    DLIB_CASSERT(best_iou > 0);
 
                     const auto x_idx = tensor_index(output_tensor, n, best_a * num_feats + 0, r, c);
                     const auto y_idx = tensor_index(output_tensor, n, best_a * num_feats + 1, r, c);
                     const auto w_idx = tensor_index(output_tensor, n, best_a * num_feats + 2, r, c);
                     const auto h_idx = tensor_index(output_tensor, n, best_a * num_feats + 3, r, c);
                     const auto o_idx = tensor_index(output_tensor, n, best_a * num_feats + 4, r, c);
-                    const auto c_idx = tensor_index(output_tensor, n, best_a * num_feats + 5, r, c);
 
                     // This grid cell should detect an object
                     binary_loss_log_and_gradient_pos(out_data[o_idx], scale * options.lambda_obj, loss, g[o_idx]);
@@ -345,25 +336,26 @@ namespace dlib
                     const double dh = out_data[h_idx] - target_dh;
 
                     // Compute MSE loss
-                    const double ldx = 0.5 * dx * dx;
-                    const double ldy = 0.5 * dy * dy;
-                    const double ldw = 0.5 * dw * dw;
-                    const double ldh = 0.5 * dh * dh;
+                    const double ldx = dx * dx;
+                    const double ldy = dy * dy;
+                    const double ldw = dw * dw;
+                    const double ldh = dh * dh;
                     loss += options.lambda_bbr * scale * (ldx + ldy + ldw + ldh);
 
                     // Compute the gradient
-                    g[x_idx] += scale * options.lambda_bbr * put_in_range(-5, 5, dx);
-                    g[y_idx] += scale * options.lambda_bbr * put_in_range(-5, 5, dy);
-                    g[w_idx] += scale * options.lambda_bbr * put_in_range(-5, 5, dw);
-                    g[h_idx] += scale * options.lambda_bbr * put_in_range(-5, 5, dh);
+                    g[x_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dx);
+                    g[y_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dy);
+                    g[w_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dw);
+                    g[h_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dh);
 
                     // Compute binary cross-entropy loss
                     for (long k = 0; k < num_classes; ++k)
                     {
+                        const auto c_idx = tensor_index(output_tensor, n, best_a * num_feats + 5 + k, r, c);
                         if (truth_box.label == options.labels[k])
-                            binary_loss_log_and_gradient_pos(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
+                            binary_loss_log_and_gradient_pos(out_data[c_idx], scale * options.lambda_cls, loss, g[c_idx]);
                         else
-                            binary_loss_log_and_gradient_neg(out_data[c_idx + k], scale * options.lambda_cls, loss, g[c_idx + k]);
+                            binary_loss_log_and_gradient_neg(out_data[c_idx], scale * options.lambda_cls, loss, g[c_idx]);
                     }
                 }
             }
