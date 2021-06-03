@@ -17,6 +17,7 @@ int main(const int argc, const char** argv)
 try
 {
     command_line_parser parser;
+    parser.add_option("size", "image size for training (default: 224)", 1);
     parser.add_option("learning-rate", "initial learning rate (default: 0.01)", 1);
     parser.add_option("batch-size", "mini batch size (default: 8)", 1);
     parser.add_option("burnin", "number of warmup steps (default: 5000)", 1);
@@ -35,6 +36,7 @@ try
     const size_t batch_size = get_option(parser, "batch-size", 8);
     const size_t burnin = get_option(parser, "burnin", 5000);
     const size_t steps = get_option(parser, "steps", 100000);
+    const size_t image_size = get_option(parser, "size", 224);
     const std::string data_directory = parser[0];
     image_dataset_metadata::dataset dataset;
     image_dataset_metadata::load_image_dataset_metadata(dataset, data_directory + "/training.xml");
@@ -76,15 +78,14 @@ try
     trainer.set_iterations_without_progress_threshold(5000);
     trainer.set_learning_rate(learning_rate);
     trainer.set_mini_batch_size(batch_size);
-    trainer.set_min_learning_rate(1e-5);
-    trainer.set_synchronization_file("yolov3_sync", std::chrono::minutes(15));
     trainer.set_learning_rate_schedule(learning_rate_schedule);
+    trainer.set_synchronization_file("yolov3_sync", std::chrono::minutes(15));
     std::cout << trainer;
     std::cout << "  burnin: " << burnin << std::endl;
     std::cout << "  #steps: " << steps << std::endl;
 
     dlib::pipe<std::pair<matrix<rgb_pixel>, std::vector<yolo_rect>>> train_data(1000);
-    auto loader = [&dataset, &data_directory, &train_data](time_t seed) {
+    auto loader = [&dataset, &data_directory, &train_data, &image_size](time_t seed) {
         dlib::rand rnd(time(nullptr) + seed);
         matrix<rgb_pixel> image, letterbox;
         std::pair<matrix<rgb_pixel>, std::vector<yolo_rect>> temp;
@@ -94,7 +95,7 @@ try
             auto idx = rnd.get_random_32bit_number() % dataset.images.size();
             load_image(image, data_directory + "/" + dataset.images[idx].filename);
 
-            auto tform = rectangle_transform(letterbox_image(image, letterbox, 416));
+            auto tform = rectangle_transform(letterbox_image(image, letterbox, image_size));
             for (const auto& box : dataset.images[idx].boxes)
             {
                 boxes.push_back(yolo_rect(tform(box.rect), 1, box.label));
