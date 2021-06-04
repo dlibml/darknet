@@ -52,7 +52,8 @@ namespace dlib
         std::unordered_map<int, std::vector<anchor_box_details>> anchors;
         std::vector<std::string> labels;
         double confidence_threshold = 0.25;
-        double truth_match_iou_threshold = 0.7;
+        double truth_match_iou_threshold = 0.3;
+        double ignore_iou_threshold = 0.7;
         test_box_overlap overlaps_nms = test_box_overlap(0.45, 1.0);
         test_box_overlap overlaps_ignore = test_box_overlap(0.5, 1.0);
         double lambda_obj = 1.0f;
@@ -69,6 +70,7 @@ namespace dlib
         serialize(item.anchors, out);
         serialize(item.confidence_threshold, out);
         serialize(item.truth_match_iou_threshold, out);
+        serialize(item.ignore_iou_threshold, out);
         serialize(item.overlaps_nms, out);
         serialize(item.overlaps_ignore, out);
         serialize(item.lambda_obj, out);
@@ -85,6 +87,7 @@ namespace dlib
         deserialize(item.anchors, in);
         deserialize(item.confidence_threshold, in);
         deserialize(item.truth_match_iou_threshold, in);
+        deserialize(item.ignore_iou_threshold, in);
         deserialize(item.overlaps_nms, in);
         deserialize(item.overlaps_ignore, in);
         deserialize(item.lambda_obj, in);
@@ -286,7 +289,7 @@ namespace dlib
                             }
 
                             // Only incur loss for the boxes that are below a certain IoU threshold
-                            if (best_iou < options.truth_match_iou_threshold)
+                            if (best_iou < options.ignore_iou_threshold)
                                 binary_loss_log_and_gradient_neg(out_data[o_idx], scale * options.lambda_noobj, loss, g[o_idx]);
                         }
                     }
@@ -313,7 +316,9 @@ namespace dlib
                         }
                     }
 
-                    DLIB_CASSERT(best_iou > 0);
+                    // Only update those anchors that match reasonably well
+                    if (best_iou < options.truth_match_iou_threshold)
+                        continue;
 
                     const auto x_idx = tensor_index(output_tensor, n, best_a * num_feats + 0, r, c);
                     const auto y_idx = tensor_index(output_tensor, n, best_a * num_feats + 1, r, c);
