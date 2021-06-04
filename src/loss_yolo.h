@@ -52,13 +52,12 @@ namespace dlib
         std::unordered_map<int, std::vector<anchor_box_details>> anchors;
         std::vector<std::string> labels;
         double confidence_threshold = 0.25;
-        double truth_match_iou_threshold = 0.3;
         double ignore_iou_threshold = 0.7;
         test_box_overlap overlaps_nms = test_box_overlap(0.45, 1.0);
         test_box_overlap overlaps_ignore = test_box_overlap(0.5, 1.0);
         double lambda_obj = 1.0f;
         double lambda_noobj = 1.0f;
-        double lambda_bbr = 1.0f;
+        double lambda_bbr = 0.75f;
         double lambda_cls = 1.0f;
 
     };
@@ -69,7 +68,6 @@ namespace dlib
         serialize(version, out);
         serialize(item.anchors, out);
         serialize(item.confidence_threshold, out);
-        serialize(item.truth_match_iou_threshold, out);
         serialize(item.ignore_iou_threshold, out);
         serialize(item.overlaps_nms, out);
         serialize(item.overlaps_ignore, out);
@@ -86,7 +84,6 @@ namespace dlib
             throw serialization_error("Unexpected version found while deserializing dlib::yolo_options.");
         deserialize(item.anchors, in);
         deserialize(item.confidence_threshold, in);
-        deserialize(item.truth_match_iou_threshold, in);
         deserialize(item.ignore_iou_threshold, in);
         deserialize(item.overlaps_nms, in);
         deserialize(item.overlaps_ignore, in);
@@ -305,19 +302,26 @@ namespace dlib
                     const long r = t_center.y() / stride_y;
                     double best_iou = 0;
                     size_t best_a = 0;
-                    for (size_t a = 0; a < anchors.size(); ++a)
+                    size_t best_tag_id = 0;
+                    for (const auto& item : options.anchors)
                     {
-                        const yolo_rect anchor(centered_drect(t_center, anchors[a].width, anchors[a].height));
-                        const double iou = compute_iou(truth_box, anchor);
-                        if (iou > best_iou)
+                        const auto tag_id = item.first;
+                        const auto details = item.second;
+                        for (size_t a = 0; a < details.size(); ++a)
                         {
-                            best_iou = iou;
-                            best_a = a;
+                            const yolo_rect anchor(centered_drect(t_center, details[a].width, details[a].height));
+                            const double iou = compute_iou(truth_box, anchor);
+                            if (iou > best_iou)
+                            {
+                                best_iou = iou;
+                                best_a = a;
+                                best_tag_id = tag_id;
+                            }
                         }
                     }
 
-                    // Only update those anchors that match reasonably well
-                    if (best_iou < options.truth_match_iou_threshold)
+                    // Skip if the best anchor is not from the current stride
+                    if (best_tag_id != tag_id<TAG_TYPE>::id)
                         continue;
 
                     const auto x_idx = tensor_index(output_tensor, n, best_a * num_feats + 0, r, c);
@@ -329,14 +333,14 @@ namespace dlib
                     // This grid cell should detect an object
                     binary_loss_log_and_gradient_pos(out_data[o_idx], scale * options.lambda_obj, loss, g[o_idx]);
 
-                    const double target_dx = t_center.x() / stride_x - c;
-                    const double target_dy = t_center.y() / stride_y - r;
-                    const double target_dw = std::log(truth_box.rect.width() / static_cast<double>(anchors[best_a].width));
-                    const double target_dh = std::log(truth_box.rect.height() / static_cast<double>(anchors[best_a].height));
-                    const double dx = sigmoid(out_data[x_idx]) - target_dx;
-                    const double dy = sigmoid(out_data[y_idx]) - target_dy;
-                    const double dw = out_data[w_idx] - target_dw;
-                    const double dh = out_data[h_idx] - target_dh;
+                    const double tx = t_center.x() / stride_x - c;
+                    const double ty = t_center.y() / stride_y - r;
+                    const double tw = std::log(truth_box.rect.width() / static_cast<double>(anchors[best_a].width));
+                    const double th = std::log(truth_box.rect.height() / static_cast<double>(anchors[best_a].height));
+                    const double dx = sigmoid(out_data[x_idx]) - tx;
+                    const double dy = sigmoid(out_data[y_idx]) - ty;
+                    const double dw = out_data[w_idx] - tw;
+                    const double dh = out_data[h_idx] - th;
 
                     // Compute MSE loss
                     const double ldx = dx * dx;
