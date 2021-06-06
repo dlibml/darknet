@@ -148,69 +148,69 @@ namespace darknet
                     tag1<conblock4<nf * 2, 2,
                          SUBNET>>>>>>>>>>>>;
 
-        template <int classes>
-        using yolov3 = yolo<256, classes, ytag8, ntag8,
+        template <long num_classes>
+        using yolov3 = yolo<256, num_classes, ytag8, ntag8,
                        concat2<htag8, btag8,
                  htag8<upsample<2, conblock<128, 1, 1,
                        nskip16<
-                       yolo<512, classes, ytag16, ntag16,
+                       yolo<512, num_classes, ytag16, ntag16,
                        concat2<htag16, btag16,
                 htag16<upsample<2, conblock<256, 1, 1,
                        nskip32<
-                       yolo<1024, classes, ytag32, ntag32,
+                       yolo<1024, num_classes, ytag32, ntag32,
                        backbone53<tag1<input_rgb_image>>
                        >>>>>>>>>>>>>;
 
-        template <int classes, typename SUBNET>
-        using yolov4 = yolo<1024, classes, ytag32, ntag32,  // 161
-                       concat2<htag32, ntag32,              // 153
-                htag32<conblock<512, 3, 2,                  // 152
-                       nskip16<                             // 151
-                       yolo<512, classes, ytag16, ntag16,   // 150
-                       concat2<htag16, ntag16,              // 142
-                htag16<conblock<256, 3, 2,                  // 141
-                       nskip8<                              // 140
-                       yolo<256, classes, ytag8, ntag8,     // 139
-                       concat2<tag1, tag2,                  // 131
-                  tag1<conblock<128, 1, 1,                  // 130
-                       bskip8<                              // 129
-                  tag2<upsample<2,                          // 128
-                       conblock<128, 1, 1,                  // 127
-                ntag16<conblock5<256, 2,                    // 126
-                       concat2<tag1, tag2,                  // 121
-                  tag1<conblock<256, 1, 1,                  // 120
-                       bskip16<                             // 119
-                  tag2<upsample<2,                          // 118
-                       conblock<256, 1, 1,                  // 117
+        template <long num_classes, typename SUBNET>
+        using yolov4 = yolo<1024, num_classes, ytag32, ntag32,  // 161
+                       concat2<htag32, ntag32,                  // 153
+                htag32<conblock<512, 3, 2,                      // 152
+                       nskip16<                                 // 151
+                       yolo<512, num_classes, ytag16, ntag16,   // 150
+                       concat2<htag16, ntag16,                  // 142
+                htag16<conblock<256, 3, 2,                      // 141
+                       nskip8<                                  // 140
+                       yolo<256, num_classes, ytag8, ntag8,     // 139
+                       concat2<tag1, tag2,                      // 131
+                  tag1<conblock<128, 1, 1,                      // 130
+                       bskip8<                                  // 129
+                  tag2<upsample<2,                              // 128
+                       conblock<128, 1, 1,                      // 127
+                ntag16<conblock5<256, 2,                        // 126
+                       concat2<tag1, tag2,                      // 121
+                  tag1<conblock<256, 1, 1,                      // 120
+                       bskip16<                                 // 119
+                  tag2<upsample<2,                              // 118
+                       conblock<256, 1, 1,                      // 117
                 ntag32<conblock3<512, 2,
                        spp<
-                       conblock3<512, 2,                    // 107
+                       conblock3<512, 2,                        // 107
                        SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
-        template <int classes, typename SUBNET>
-        using yolov4_sam = yolo_sam<1024, classes, ytag32, ntag32,  // 161
-                           concat2<htag32, ntag32,                  // 153
-                    htag32<conblock<512, 3, 2,                      // 152
-                           nskip16<                                 // 151
-                           yolo_sam<512, classes, ytag16, ntag16,   // 150
-                           concat2<htag16, ntag16,                  // 142
-                    htag16<conblock<256, 3, 2,                      // 141
-                           nskip8<                                  // 140
-                           yolo_sam<256, classes, ytag8, ntag8,     // 139
-                           concat2<tag1, tag2,                      // 131
-                      tag1<conblock<128, 1, 1,                      // 130
-                           bskip8<                                  // 129
-                      tag2<upsample<2,                              // 128
-                           conblock<128, 1, 1,                      // 127
-                    ntag16<conblock5<256, 2,                        // 126
-                           concat2<tag1, tag2,                      // 121
-                      tag1<conblock<256, 1, 1,                      // 120
-                           bskip16<                                 // 119
-                      tag2<upsample<2,                              // 118
-                           conblock<256, 1, 1,                      // 117
+        template <long num_classes, typename SUBNET>
+        using yolov4_sam = yolo_sam<1024, num_classes, ytag32, ntag32,  // 161
+                           concat2<htag32, ntag32,                      // 153
+                    htag32<conblock<512, 3, 2,                          // 152
+                           nskip16<                                     // 151
+                           yolo_sam<512, num_classes, ytag16, ntag16,   // 150
+                           concat2<htag16, ntag16,                      // 142
+                    htag16<conblock<256, 3, 2,                          // 141
+                           nskip8<                                      // 140
+                           yolo_sam<256, num_classes, ytag8, ntag8,     // 139
+                           concat2<tag1, tag2,                          // 131
+                      tag1<conblock<128, 1, 1,                          // 130
+                           bskip8<                                      // 129
+                      tag2<upsample<2,                                  // 128
+                           conblock<128, 1, 1,                          // 127
+                    ntag16<conblock5<256, 2,                            // 126
+                           concat2<tag1, tag2,                          // 121
+                      tag1<conblock<256, 1, 1,                          // 120
+                           bskip16<                                     // 119
+                      tag2<upsample<2,                                  // 118
+                           conblock<256, 1, 1,                          // 117
                     ntag32<conblock3<512, 2,
                            spp<
-                           conblock3<512, 2,                        // 107
+                           conblock3<512, 2,                            // 107
                            SUBNET>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>;
 
         template <typename INPUT>
