@@ -11,7 +11,6 @@ namespace dlib
         return lhs.detection_confidence < rhs.detection_confidence;
     }
 
-    // clang-format off
     struct yolo_options
     {
     public:
@@ -184,8 +183,8 @@ namespace dlib
                                 const auto w = out_data[tensor_index(output_tensor, n, a * num_feats + 2, r, c)];
                                 const auto h = out_data[tensor_index(output_tensor, n, a * num_feats + 3, r, c)];
                                 yolo_rect det(centered_drect(dpoint((x + c) * stride_x, (y + r) * stride_y),
-                                                           anchors[a].width * w / (1 - w),
-                                                           anchors[a].height * h / ( 1 - h)));
+                                                             w / (1 - w) * anchors[a].width,
+                                                             h / (1 - h) * anchors[a].height));
                                 for (long k = 0; k < num_classes; ++k)
                                 {
                                     const float conf = out_data[tensor_index(output_tensor, n, a * num_feats + 5 + k, r, c)];
@@ -488,7 +487,6 @@ namespace dlib
 
     template <template <typename> class TAG_1, template <typename> class TAG_2, template <typename> class TAG_3, typename SUBNET>
     using loss_yolo = add_loss_layer<loss_yolo_<TAG_1, TAG_2, TAG_3>, SUBNET>;
-    // clang-format on
-}  // namespace dlib
+}
 
-#endif  // loss_yolo_h_INCLUDED
+#endif
