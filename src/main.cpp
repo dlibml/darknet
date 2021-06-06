@@ -84,6 +84,7 @@ try
 
     const auto label_to_color = get_color_map(labels);
     webcam_window win;
+    win.conf_thresh = conf_thresh;
 
     dlib::yolo_options options;
     options.confidence_threshold = conf_thresh;
@@ -114,20 +115,26 @@ try
         for (const auto& file :
              dlib::get_files_in_directory_tree(images_dir, dlib::match_endings(exts)))
         {
+            net.loss_details().adjust_threshold(win.conf_thresh);
             dlib::matrix<dlib::rgb_pixel> image, letterbox(image_size, image_size);
             dlib::load_image(image, file.full_name());
             const auto tform = preprocess_image(image, letterbox, image_size);
             auto detections = net(letterbox);
             postprocess_detections(tform, detections);
             render_bounding_boxes(image, detections, label_to_color, true);
-            const std::string out_name = file.name().substr(0, file.name().rfind(".")) + ".png";
-            dlib::save_png(image, output_dir + "/" + out_name);
+            win.set_image(image);
+            // const std::string out_name = file.name().substr(0, file.name().rfind(".")) + ".png";
+            // dlib::save_png(image, output_dir + "/" + out_name);
             std::cerr << file.name() << ": " << detections.size() << " detections\n";
+            for (const auto& det : detections)
+            {
+                std::cout << det.label << " " << det.detection_confidence << ": " << det.rect << std::endl;
+            }
+            std::cin.get();
         }
         return EXIT_SUCCESS;
     }
 
-    win.conf_thresh = conf_thresh;
     const std::string out_path = dlib::get_option(parser, "output", "");
     cv::VideoCapture vid_src;
     cv::VideoWriter vid_snk;

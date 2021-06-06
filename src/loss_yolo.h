@@ -176,17 +176,21 @@ namespace dlib
                     {
                         for (long c = 0; c < output_tensor.nc(); ++c)
                         {
-                            const float obj = sigmoid(out_data[tensor_index(output_tensor, n, a * num_feats + 4, r, c)]);
+                            const float obj = out_data[tensor_index(output_tensor, n, a * num_feats + 4, r, c)];
                             if (obj > options.confidence_threshold)
                             {
-                                const double x = (sigmoid(out_data[tensor_index(output_tensor, n, a * num_feats + 0, r, c)]) + c) * stride_x;
-                                const double y = (sigmoid(out_data[tensor_index(output_tensor, n, a * num_feats + 1, r, c)]) + r) * stride_y;
-                                const double w = std::exp(out_data[tensor_index(output_tensor, n, a * num_feats + 2, r, c)]) * anchors[a].width;
-                                const double h = std::exp(out_data[tensor_index(output_tensor, n, a * num_feats + 3, r, c)]) * anchors[a].height;
+                                const auto x_idx = tensor_index(output_tensor, n, a * num_feats + 0, r, c);
+                                const auto y_idx = tensor_index(output_tensor, n, a * num_feats + 1, r, c);
+                                const auto w_idx = tensor_index(output_tensor, n, a * num_feats + 2, r, c);
+                                const auto h_idx = tensor_index(output_tensor, n, a * num_feats + 3, r, c);
+                                const double x = (out_data[x_idx] + c) * stride_x;
+                                const double y = (out_data[y_idx] + r) * stride_y;
+                                const double w = out_data[w_idx] / (1 - out_data[w_idx]) * anchors[a].width;
+                                const double h = out_data[h_idx] / (1 - out_data[h_idx]) * anchors[a].height;
                                 yolo_rect d(centered_drect(dpoint(x, y), w, h), 0);
                                 for (long k = 0; k < num_classes; ++k)
                                 {
-                                    const float p = sigmoid(out_data[tensor_index(output_tensor, n, a * num_feats + 5 + k, r, c)]);
+                                    const float p = out_data[tensor_index(output_tensor, n, a * num_feats + 5 + k, r, c)];
                                     if (p > d.detection_confidence)
                                     {
                                         d.detection_confidence = p;
@@ -200,30 +204,6 @@ namespace dlib
                         }
                     }
                 }
-            }
-
-            // Loss and gradient for a positve sample
-            static inline void binary_loss_log_and_gradient_pos(
-                const double z,
-                const double scale,
-                double& loss,
-                float& grad
-            )
-            {
-                loss += scale * log1pexp(-z);
-                grad = scale * (sigmoid(z) - 1);
-            }
-
-            // Loss and gradient for a negative sample
-            static inline void binary_loss_log_and_gradient_neg(
-                const double z,
-                const double scale,
-                double& loss,
-                float& grad
-            )
-            {
-                loss += scale * (z + log1pexp(-z));
-                grad = scale * sigmoid(z);
             }
 
             static inline double compute_iou(const yolo_rect& a, const yolo_rect& b)
@@ -271,10 +251,10 @@ namespace dlib
 
                             // The prediction at r, c for anchor a
                             const yolo_rect pred(centered_drect(
-                                dpoint((sigmoid(out_data[x_idx]) + c) * stride_x, (sigmoid(out_data[y_idx]) + r) * stride_y),
-                                std::exp(out_data[w_idx]) * anchors[a].width,
-                                std::exp(out_data[h_idx]) * anchors[a].height)
-                            );
+                                dpoint((out_data[x_idx] + c) * stride_x, (out_data[y_idx] + r) * stride_y),
+                                out_data[w_idx] / (1 - out_data[w_idx]) * anchors[a].width,
+                                out_data[h_idx] / (1 - out_data[h_idx]) * anchors[a].height
+                            ));
 
                             // Find the best IoU for all ground truth boxes
                             double best_iou = 0;
@@ -287,7 +267,10 @@ namespace dlib
 
                             // Only incur loss for the boxes that are below a certain IoU threshold
                             if (best_iou < options.ignore_iou_threshold)
-                                binary_loss_log_and_gradient_neg(out_data[o_idx], scale * options.lambda_noobj, loss, g[o_idx]);
+                            {
+                                loss += -scale * options.lambda_noobj * safe_log(1 - out_data[o_idx]);
+                                g[o_idx] += scale * options.lambda_noobj * out_data[o_idx];
+                            }
                         }
                     }
                 }
@@ -331,38 +314,41 @@ namespace dlib
                     const auto o_idx = tensor_index(output_tensor, n, best_a * num_feats + 4, r, c);
 
                     // This grid cell should detect an object
-                    binary_loss_log_and_gradient_pos(out_data[o_idx], scale * options.lambda_obj, loss, g[o_idx]);
+                    loss += -scale * options.lambda_obj * safe_log(out_data[o_idx]);
+                    g[o_idx] += scale * options.lambda_obj * (out_data[o_idx] - 1);
 
                     const double tx = t_center.x() / stride_x - c;
                     const double ty = t_center.y() / stride_y - r;
-                    const double tw = std::log(truth_box.rect.width() / static_cast<double>(anchors[best_a].width));
-                    const double th = std::log(truth_box.rect.height() / static_cast<double>(anchors[best_a].height));
-                    const double dx = sigmoid(out_data[x_idx]) - tx;
-                    const double dy = sigmoid(out_data[y_idx]) - ty;
+                    const double tw = truth_box.rect.width() / static_cast<double>(anchors[best_a].width + truth_box.rect.width());
+                    const double th = truth_box.rect.height() / static_cast<double>(anchors[best_a].height + truth_box.rect.height());
+                    const double dx = out_data[x_idx] - tx;
+                    const double dy = out_data[y_idx] - ty;
                     const double dw = out_data[w_idx] - tw;
                     const double dh = out_data[h_idx] - th;
 
                     // Compute MSE loss
-                    const double ldx = dx * dx;
-                    const double ldy = dy * dy;
-                    const double ldw = dw * dw;
-                    const double ldh = dh * dh;
-                    loss += options.lambda_bbr * scale * (ldx + ldy + ldw + ldh);
+                    loss += scale * options.lambda_bbr * (dx * dx + dy * dy + dw * dw + dh * dh);
 
                     // Compute the gradient
-                    g[x_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dx);
-                    g[y_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dy);
-                    g[w_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dw);
-                    g[h_idx] = scale * options.lambda_bbr * put_in_range(-5, 5, dh);
+                    g[x_idx] += scale * options.lambda_bbr * dx;
+                    g[y_idx] += scale * options.lambda_bbr * dy;
+                    g[w_idx] += scale * options.lambda_bbr * dw;
+                    g[h_idx] += scale * options.lambda_bbr * dh;
 
                     // Compute binary cross-entropy loss
                     for (long k = 0; k < num_classes; ++k)
                     {
                         const auto c_idx = tensor_index(output_tensor, n, best_a * num_feats + 5 + k, r, c);
                         if (truth_box.label == options.labels[k])
-                            binary_loss_log_and_gradient_pos(out_data[c_idx], scale * options.lambda_cls, loss, g[c_idx]);
+                        {
+                            loss += -scale * options.lambda_cls * safe_log(out_data[c_idx]);
+                            g[c_idx] += scale * options.lambda_cls * (out_data[c_idx] - 1);
+                        }
                         else
-                            binary_loss_log_and_gradient_neg(out_data[c_idx], scale * options.lambda_cls, loss, g[c_idx]);
+                        {
+                            loss += -scale * options.lambda_cls * safe_log(1 - out_data[c_idx]);
+                            g[c_idx] += scale * options.lambda_cls * out_data[c_idx];
+                        }
                     }
                 }
             }

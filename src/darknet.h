@@ -134,19 +134,19 @@ namespace darknet
                tag1<SUBNET>>>>>>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
-        using yolo = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
+        using yolo = YTAG<sig<con<3 * (classes + 5), 1, 1, 1, 1,
                      conblock<nf, 3, 1,
                 NTAG<conblock5<nf / 2, 2,
-                     SUBNET>>>>>;
+                     SUBNET>>>>>>;
 
         template <long nf, int classes, template <typename> class YTAG, template <typename> class NTAG, typename SUBNET>
-        using yolo_sam = YTAG<con<3 * (classes + 5), 1, 1, 1, 1,
+        using yolo_sam = YTAG<sig<con<3 * (classes + 5), 1, 1, 1, 1,
                          conblock<nf, 3, 1,
                     NTAG<conblock<nf / 2, 1, 1,
                          mult_prev1<
                          sig<bn_con<con<nf, 1, 1, 1, 1,
                     tag1<conblock4<nf * 2, 2,
-                         SUBNET>>>>>>>>>>>;
+                         SUBNET>>>>>>>>>>>>;
 
         template <int classes>
         using yolov3 = yolo<256, classes, ytag8, ntag8,
@@ -298,7 +298,7 @@ namespace darknet
 
     // clang-format on
 
-    template <typename net_type, unsigned int offset = 1>
+    template <typename net_type>
     void setup_detector(net_type& net, int num_classes = 80, size_t img_size = 416)
     {
         // remove bias
@@ -308,9 +308,9 @@ namespace darknet
         // setup leaky relus
         visit_computational_layers(net, [](leaky_relu_& l) { l = leaky_relu_(0.1); });
         // set the number of filters
-        layer<ytag8, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag16, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
-        layer<ytag32, offset>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag8, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag16, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
+        layer<ytag32, 2>(net).layer_details().set_num_filters(3 * (num_classes + 5));
         // allocate the network
         matrix<rgb_pixel> image(img_size, img_size);
         net(image);

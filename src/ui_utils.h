@@ -1,8 +1,6 @@
 #ifndef ui_utils_h_INCLUDED
 #define ui_utils_h_INCLUDED
 
-#include "yolo.h"
-
 #include <dlib/gui_widgets.h>
 #include <dlib/opencv.h>
 #include <opencv2/highgui.hpp>
@@ -164,12 +162,12 @@ class webcam_window : public dlib::image_window
                 break;
             case '+':
             case 'k':
-                conf_thresh = std::min(conf_thresh + 0.05f, 1.0f);
+                conf_thresh = std::min(conf_thresh + 0.01f, 1.0f);
                 update_title();
                 break;
             case '-':
             case 'j':
-                conf_thresh = std::max(conf_thresh - 0.05f, 0.05f);
+                conf_thresh = std::max(conf_thresh - 0.01f, 0.01f);
                 update_title();
                 break;
             case 'q':

@@ -5,8 +5,6 @@
 
 using net_train_type = darknet::yolov3_train;
 using net_infer_type = darknet::yolov3_infer;
-// layer offset is 2 for yolov4x_mish yolov4_csp and scaled_yolov4, and 1 for the previous models
-const unsigned int layer_offset = 1;
 
 int main(const int argc, const char** argv)
 try
@@ -45,7 +43,7 @@ try
     }
 
     net_train_type net_train;
-    darknet::setup_detector<net_train_type, layer_offset>(net_train, num_classes, img_size);
+    darknet::setup_detector<net_train_type>(net_train, num_classes, img_size);
     std::cout << "#params: " << dlib::count_parameters(net_train) << '\n';
     dlib::visit_layers_backwards(net_train, darknet::weights_visitor(weights_path));
     net_train.clean();

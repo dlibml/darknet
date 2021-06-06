@@ -10,6 +10,7 @@
 using namespace std;
 using namespace dlib;
 
+
 using darknet::ytag8, darknet::ytag16, darknet::ytag32;
 using net_type = dlib::loss_yolo<ytag8, ytag16, ytag32, darknet::yolov3_train>;
 
@@ -36,7 +37,7 @@ try
     const size_t batch_size = get_option(parser, "batch-size", 8);
     const size_t burnin = get_option(parser, "burnin", 5000);
     const size_t max_steps = get_option(parser, "steps", 100000);
-    const size_t image_size = get_option(parser, "size", 224);
+    const size_t image_size = get_option(parser, "size", 416);
     const std::string data_directory = parser[0];
     image_dataset_metadata::dataset dataset;
     image_dataset_metadata::load_image_dataset_metadata(dataset, data_directory + "/training.xml");
@@ -78,7 +79,7 @@ try
 
     dnn_trainer<net_type> trainer(net, sgd(0.0005, 0.9));
     trainer.be_verbose();
-    trainer.set_iterations_without_progress_threshold(5000);
+    trainer.set_iterations_without_progress_threshold(10000);
     trainer.set_learning_rate(learning_rate);
     trainer.set_mini_batch_size(batch_size);
     trainer.set_learning_rate_schedule(learning_rate_schedule);
