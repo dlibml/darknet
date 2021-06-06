@@ -55,10 +55,10 @@ namespace dlib
         double ignore_iou_threshold = 0.7;
         test_box_overlap overlaps_nms = test_box_overlap(0.45, 1.0);
         test_box_overlap overlaps_ignore = test_box_overlap(0.5, 1.0);
-        double lambda_obj = 1.0f;
-        double lambda_noobj = 1.0f;
-        double lambda_bbr = 0.75f;
-        double lambda_cls = 1.0f;
+        double lambda_obj = 1.0;
+        double lambda_noobj = 1.0;
+        double lambda_bbr = 0.75;
+        double lambda_cls = 1.0;
 
     };
 
