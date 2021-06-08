@@ -1,6 +1,7 @@
 #ifndef darknet_weights_visitor_h_INCLUDED
 #define darknet_weights_visitor_h_INCLUDED
 
+#include <cstring>
 #include <dlib/dnn.h>
 
 namespace darknet
@@ -179,7 +180,13 @@ namespace darknet
         std::vector<char> read_bytes(const std::string& filename)
         {
             std::ifstream file(filename, std::ios::binary);
+            file.seekg(0, std::ios::end);
+            const size_t filesize = file.tellg();
+            file.seekg(0);
+            
             std::vector<char> v;
+            v.reserve(filesize); //allocate the exact space required ONCE.
+            
             std::copy(
                 std::istreambuf_iterator<char>(file),
                 std::istreambuf_iterator<char>(),
@@ -189,8 +196,10 @@ namespace darknet
 
         template <typename T> weights_visitor& operator>>(T& x)
         {
-            T* ptr = (T*)&weights[offset];
-            x = *ptr;
+            //Don't use type punning. 
+            //Apparently, that's bad and can cause undefined behaviour. 
+            //Instead, use memcpy()
+            std::memcpy(&x, &weights[offset], sizeof(T));
             offset += sizeof(T);
             return *this;
         }
