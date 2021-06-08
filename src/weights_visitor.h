@@ -89,19 +89,22 @@ namespace darknet
         template <long nf, long nr, long nc, int sy, int sx, int py, int px, typename SUBNET>
         void operator()(size_t, add_layer<con_<nf, nr, nc, sy, sx, py, px>, SUBNET>& l)
         {
-            auto& conv = l.layer_details();
-            if (not conv.bias_is_disabled())
+            if (not l.layer_details().bias_is_disabled())
             {
-                tensor& con_t = conv.get_layer_params();
-                auto filters = alias_tensor(
-                    conv.num_filters(),
-                    l.subnet().get_output().k(),
-                    conv.nr(),
-                    conv.nc());
-                auto biases = alias_tensor(1, conv.num_filters());
-                auto f = filters(con_t, 0);
-                auto b = biases(con_t, filters.size());
-                DLIB_CASSERT(con_t.size() == (filters.size() + biases.size()));
+                tensor& params = l.layer_details().get_layer_params();
+
+                // Guess the number of input filters.
+                // This is equivalent to calling: l.subnet().get_output().k().
+                // However that requires the subnet to have a get_ouput() method,
+                // which is not the case when the subnet is an input layer.
+                // That would require a hack like tagging the input layer,
+                // but it causes memory fluctuation and degrades performance.
+                const long nf_in = (params.size() - nf) / nf / nr / nc;
+                auto filters = alias_tensor(nf, nf_in, nr, nc);
+                auto biases = alias_tensor(1, nf);
+                auto f = filters(params, 0);
+                auto b = biases(params, filters.size());
+                DLIB_CASSERT(params.size() == (filters.size() + biases.size()));
                 DLIB_CASSERT(f.size() == filters.size());
                 DLIB_CASSERT(b.size() == biases.size());
 
